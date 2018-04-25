@@ -178,8 +178,71 @@ harvest.df %>%
   ggtitle("Late Winter - Harvest by Stat Week and District")
 
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Join ASL and Harvest data by Quad by SW
+harvest_yr_sw_fishery_quad.df <- harvest.df %>% 
+  filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
+  group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  summarise(Harvest = sum(`N Catch`))
+
+harvest_ASL_join.df <- ASL.df %>% 
+  filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  full_join(harvest_yr_sw_fishery_quad.df, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0))  # replace NA in samples and harvest with 0
+  
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #### Early Winter ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Discussion with managers and PST folks indicated that they want as fine of scale data as possible
+# However, this is what we have for samples
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017") %>%
+  group_by(Quadrant) %>% 
+  summarise(Samples = sum(n)) %>% 
+  spread(Quadrant, Samples)
+
+# Thus the plan for extraction is to pick ~200 for 171 (NO) and run everything else
+# With the important caveat of subsampling in proportion to harvest by SW for each quadrant
+
+## 171
+# What does proportional sampling look like?
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 171) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 200)) %>%  # if we want 200 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest)
+
+# How many fish per week?
+extraction_EW_171 <- data_frame('Stat Week' = 41:51,
+                                n = c(29, 25, 19, 33, 17, 7, 14, 10, 14, 30, 2))
+
+# Randomly pick fish
+EW_171_torun <- ASL.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 171) %>% 
+  nest(-`Stat Week`) %>% 
+  left_join(extraction_EW_171, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+EW_171_torun %>% 
+  count(`Stat Week`)
+  
+  
+
+
+# 172
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 172) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * sum(n))) %>%  # if we want all samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_underage = ifelse(n_sufficeint, 0, pHarvest - n))
+
+
 #~~~~~~~~~~~~~~~~~~
 # 171
 # Subsample 293

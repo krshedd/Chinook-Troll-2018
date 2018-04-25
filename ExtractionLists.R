@@ -178,21 +178,34 @@ harvest.df %>%
   ggtitle("Late Winter - Harvest by Stat Week and District")
 
 
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## Join ASL and Harvest data by Quad by SW
+# Roll up harvest to Quad level
 harvest_yr_sw_fishery_quad.df <- harvest.df %>% 
   filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
   group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
   summarise(Harvest = sum(`N Catch`))
 
+# Foll up ASL to SW and Quad level, join with harvest
 harvest_ASL_join.df <- ASL.df %>% 
   filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
   filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
   count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
   full_join(harvest_yr_sw_fishery_quad.df, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
   replace_na(list(n = 0, Harvest = 0))  # replace NA in samples and harvest with 0
-  
+
+# Plot samples and harvest together as proportions
+harvest_ASL_join.df %>% 
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  mutate(n = n / sum(n), Harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -Year_f, -`Stat Week`, -Fishery, -Quadrant) %>% 
+  filter(Fishery == "Early Winter") %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  facet_grid(Quadrant ~ variable, scales = "free_y") +
+  ggtitle("Samples and Harvest by Stat Week and Quadrant for Early Winter AY18")
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #### Early Winter ####
@@ -208,23 +221,29 @@ harvest_ASL_join.df %>%
 # Thus the plan for extraction is to pick ~200 for 171 (NO) and run everything else
 # With the important caveat of subsampling in proportion to harvest by SW for each quadrant
 
+#~~~~~~~~~~~~~~~~~~
 ## 171
+# Subsample 200 fish
 # What does proportional sampling look like?
 harvest_ASL_join.df %>% 
   filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 171) %>% 
+  arrange(`Stat Week`) %>% 
   mutate(pHarvest = round(Harvest / sum(Harvest) * 200)) %>%  # if we want 200 samples proportional to harvest by SW
   mutate(n_sufficeint = n >= pHarvest) %>% 
-  mutate(n_remainings = n - pHarvest)
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
 
 # How many fish per week?
+# Need to move some extra fish missing from SW 51 and 52 up to earlier SW with more samples
 extraction_EW_171 <- data_frame('Stat Week' = 41:51,
-                                n = c(29, 25, 19, 33, 17, 7, 14, 10, 14, 30, 2))
+                                n = c(29, 25, 19, 33, 17, 7, 14, 10, 14, 30, 2)) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
 
 # Randomly pick fish
 EW_171_torun <- ASL.df %>% 
   filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 171) %>% 
   nest(-`Stat Week`) %>% 
-  left_join(extraction_EW_171, by = "Stat Week") %>% 
+  right_join(extraction_EW_171, by = "Stat Week") %>% 
   mutate(Sample = map2(data, n, sample_n)) %>% 
   unnest(Sample)
 
@@ -232,144 +251,101 @@ EW_171_torun <- ASL.df %>%
 EW_171_torun %>% 
   count(`Stat Week`)
   
-  
 
-
-# 172
+#~~~~~~~~~~~~~~~~~~
+## 172
+# Run all 16 fish if possible
+# What does proportional sampling look like?
 harvest_ASL_join.df %>% 
   filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 172) %>% 
+  arrange(`Stat Week`) %>% 
   mutate(pHarvest = round(Harvest / sum(Harvest) * sum(n))) %>%  # if we want all samples proportional to harvest by SW
   mutate(n_sufficeint = n >= pHarvest) %>% 
-  mutate(n_underage = ifelse(n_sufficeint, 0, pHarvest - n))
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Need to move some extra fish missing from SW 43, 44 to 45 and 48 to 47
+extraction_EW_172 <- data_frame('Stat Week' = c(41:50, 52),
+                                n = c(0, 0, 1, 0, 2, 1, 2, 2, 5, 1, 1)) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+EW_172_torun <- ASL.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 172) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_EW_172, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+EW_172_torun %>% 
+  count(`Stat Week`)
 
 
 #~~~~~~~~~~~~~~~~~~
-# 171
-# Subsample 293
-EW_WGC.dat <- read.xlsx(file = "Associated Data/MTA Lab Troll Harvest Data.xlsx", sheetName = "EW AY2017", header = TRUE)
-str(EW_WGC.dat)
+## 173
+# Run all 57 fish if possible, downgraded to 40 to get better temporal samples
+# What does proportional sampling look like?
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 173) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 40)) %>%  # if we want all samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
 
-EW_WGC_171.dat <- subset(EW_WGC.dat, Fishery == "Troll"  & Dist.Quad == 171 | Fishery == "Troll matched axillary" & Dist.Quad == 171)
-str(EW_WGC_171.dat)
+# How many fish per week?
+# Need to move some extra fish missing from SW 49, 50 to 48, ignore missing fish from SW 52
+extraction_EW_173 <- data_frame('Stat Week' = c(41:52),
+                                n = c(12, 9, 4, 6, 2, 1, 1, 3, 0, 0, 1, 0)) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
 
-EW_WGC2Sample_171 <- sample(EW_WGC_171.dat$Whatman.Card..)
-EW_WGC2Sample_171_order <- match(EW_WGC2Sample_171, EW_WGC_171.dat$Whatman.Card..)
+# Randomly pick fish
+EW_173_torun <- ASL.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 173) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_EW_173, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
 
-any(cumsum(EW_WGC_171.dat[EW_WGC2Sample_171_order, "X..Tissues"]) == 293)
-max2run_171 <- which(cumsum(EW_WGC_171.dat[EW_WGC2Sample_171_order, "X..Tissues"]) == 293)  # 293 samples from 171
-EW_WGC2Run_171 <- EW_WGC2Sample_171[seq(max2run_171)]
-
-#~~~~~~~~~~~~~~~~~~
-# 172
-# Run all
-EW_WGC_172.dat <- subset(EW_WGC.dat, Fishery == "Troll"  & Dist.Quad == 172 | Fishery == "Troll matched axillary" & Dist.Quad == 172)
-str(EW_WGC_172.dat)
-sum(EW_WGC_172.dat$X..Tissues)
-
-EW_WGC2Run_172 <- EW_WGC_172.dat$Whatman.Card..
-
-#~~~~~~~~~~~~~~~~~~
-# 173
-# Run all
-EW_WGC_173.dat <- subset(EW_WGC.dat, Fishery == "Troll"  & Dist.Quad == 173 | Fishery == "Troll matched axillary" & Dist.Quad == 173)
-str(EW_WGC_173.dat)
-sum(EW_WGC_173.dat$X..Tissues)
-
-EW_WGC2Run_173 <- EW_WGC_173.dat$Whatman.Card..
-
-#~~~~~~~~~~~~~~~~~~
-# 174
-# Run all
-EW_WGC_174.dat <- subset(EW_WGC.dat, Fishery == "Troll"  & Dist.Quad == 174 | Fishery == "Troll matched axillary" & Dist.Quad == 174)
-str(EW_WGC_174.dat)
-sum(EW_WGC_174.dat$X..Tissues)
-
-EW_WGC2Run_174 <- EW_WGC_174.dat$Whatman.Card..
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## Final extraction list for EW
-EW_WGC2Run <- sort(c(EW_WGC2Run_171, EW_WGC2Run_172, EW_WGC2Run_173, EW_WGC2Run_174))
-
-EW_WGC_Run.dat <- EW_WGC.dat[match(EW_WGC2Run, EW_WGC.dat$Whatman.Card..), ]
-str(EW_WGC_Run.dat)
-sum(EW_WGC_Run.dat$X..Tissues)
-aggregate(X..Tissues ~ Dist.Quad, data = EW_WGC_Run.dat, sum)
-
-# dir.create("Extraction Lists")
-write.xlsx(x = EW_WGC_Run.dat, file = "Extraction Lists/K119 Winter Spring Troll Extraction.xlsx", 
-           sheetName = "EW Extraction Data", append = TRUE, row.names = FALSE)
-write.xlsx(x = matrix(data = sapply(EW_WGC_Run.dat$Whatman.Card.., function(WGC) {ifelse(nchar(WGC) == 10, WGC, paste0("000000", WGC))}), 
-                      ncol = 1, dimnames = list(seq(EW_WGC2Run), "Whatman Cards to Extract")), 
-           file = "Extraction Lists/K119 Winter Spring Troll Extraction.xlsx", sheetName = "For LAB KTROL16EW", append = TRUE, row.names = FALSE)
-
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#### Late Winter ####
-#~~~~~~~~~~~~~~~~~~
-# 171
-# Subsample 302
-LW_WGC.dat <- read.xlsx(file = "Associated Data/MTA Lab Troll Harvest Data.xlsx", sheetName = "LW AY2017", header = TRUE)
-str(LW_WGC.dat)
-
-LW_WGC_171.dat <- subset(LW_WGC.dat, Fishery == "Late Winter Troll"  & Dist.Quad == 171)
-str(LW_WGC_171.dat)
-
-LW_WGC2Sample_171 <- sample(LW_WGC_171.dat$Whatman.Card..)
-LW_WGC2Sample_171_order <- match(LW_WGC2Sample_171, LW_WGC_171.dat$Whatman.Card..)
-
-any(cumsum(LW_WGC_171.dat[LW_WGC2Sample_171_order, "X..Tissues"]) == 302)
-max2run_171 <- which(cumsum(LW_WGC_171.dat[LW_WGC2Sample_171_order, "X..Tissues"]) == 302)  # 302 samples from 171
-LW_WGC2Run_171 <- LW_WGC2Sample_171[seq(max2run_171)]
+# Verify picked fish
+EW_173_torun %>% 
+  count(`Stat Week`)
 
 
 #~~~~~~~~~~~~~~~~~~
-# 172
-# Subsample 42
-LW_WGC_172.dat <- subset(LW_WGC.dat, Fishery == "Late Winter Troll"  & Dist.Quad == 172)
-str(LW_WGC_172.dat)
+## 174
+# Run all 91 fish if possible, downgraded to 64 to get better temporal samples
+# What does proportional sampling look like?
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 174) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 64)) %>%  # if we want all samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
 
-LW_WGC2Sample_172 <- sample(LW_WGC_172.dat$Whatman.Card..)
-LW_WGC2Sample_172_order <- match(LW_WGC2Sample_172, LW_WGC_172.dat$Whatman.Card..)
+# How many fish per week?
+# Need to move some extra fish missing from SW 47 to 46 and 49 to 50
+extraction_EW_174 <- data_frame('Stat Week' = c(41:52),
+                                n = c(15 ,14, 10, 8, 3, 4, 0, 1, 2, 3, 4, 0)) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
 
-any(cumsum(LW_WGC_172.dat[LW_WGC2Sample_172_order, "X..Tissues"]) == 42)
-max2run_172 <- which(cumsum(LW_WGC_172.dat[LW_WGC2Sample_172_order, "X..Tissues"]) == 42)  # 42 samples from 172
-LW_WGC2Run_172 <- LW_WGC2Sample_172[seq(max2run_172)]
+# Randomly pick fish
+EW_174_torun <- ASL.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 174) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_EW_174, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
 
-#~~~~~~~~~~~~~~~~~~
-# 173
-# Run all
-LW_WGC_173.dat <- subset(LW_WGC.dat, Fishery == "Late Winter Troll"  & Dist.Quad == 173)
-str(LW_WGC_173.dat)
-sum(LW_WGC_173.dat$X..Tissues)
+# Verify picked fish
+EW_174_torun %>% 
+  count(`Stat Week`)
 
-LW_WGC2Run_173 <- LW_WGC_173.dat$Whatman.Card..
-
-#~~~~~~~~~~~~~~~~~~
-# 174
-# Subsample 95
-LW_WGC_174.dat <- subset(LW_WGC.dat, Fishery == "Late Winter Troll"  & Dist.Quad == 174)
-str(LW_WGC_174.dat)
-
-LW_WGC2Sample_174 <- sample(LW_WGC_174.dat$Whatman.Card..)
-LW_WGC2Sample_174_order <- match(LW_WGC2Sample_174, LW_WGC_174.dat$Whatman.Card..)
-
-any(cumsum(LW_WGC_174.dat[LW_WGC2Sample_174_order, "X..Tissues"]) == 95)
-max2run_174 <- which(cumsum(LW_WGC_174.dat[LW_WGC2Sample_174_order, "X..Tissues"]) == 95)  # 95 samples from 174
-LW_WGC2Run_174 <- LW_WGC2Sample_174[seq(max2run_174)]
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## Final extraction list for LW
-LW_WGC2Run <- sort(c(LW_WGC2Run_171, LW_WGC2Run_172, LW_WGC2Run_173, LW_WGC2Run_174))
-
-LW_WGC_Run.dat <- LW_WGC.dat[match(LW_WGC2Run, LW_WGC.dat$Whatman.Card..), ]
-str(LW_WGC_Run.dat)
-sum(LW_WGC_Run.dat$X..Tissues)
-aggregate(X..Tissues ~ Dist.Quad, data = LW_WGC_Run.dat, sum)
-
-write.xlsx(x = LW_WGC_Run.dat, file = "Extraction Lists/K119 Winter Spring Troll Extraction.xlsx", 
-           sheetName = "LW Extraction Data", append = TRUE, row.names = FALSE)
-write.xlsx(x = matrix(data = sapply(LW_WGC_Run.dat$Whatman.Card.., function(WGC) {ifelse(nchar(WGC) == 10, WGC, paste0("000000", WGC))}), 
-                      ncol = 1, dimnames = list(seq(LW_WGC2Run), "Whatman Cards to Extract")), 
-           file = "Extraction Lists/K119 Winter Spring Troll Extraction.xlsx", sheetName = "For LAB KTROL17LW", append = TRUE, row.names = FALSE)
+## Create a single Early Winter Extraction data.frame
+EW_torun_ASL.df <- bind_rows(EW_171_torun, EW_172_torun, EW_173_torun, EW_174_torun)
+EW_torun_ASL.df %>% 
+  count(Quadrant)
 

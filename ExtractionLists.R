@@ -1,5 +1,5 @@
-#### Extraction List ####
-# AY2018 EWint and LWint
+#### Extraction Lists ####
+# AY2018
 # Kyle Shedd
 # Created Wed Apr 18 15:02:57 2018
 date()
@@ -8,9 +8,13 @@ setwd("V:/Analysis/1_SEAK/Chinook/Mixture/SEAK18")
 library(tidyverse)
 library(xlsx)
 
+dir.create("Extraction Lists")
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #### Winter ASL and Harvest Data ####
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Planning to run each Quad as it's own mixture and stratify from there
+# Business rule is to take fish from within 2 SW on either side to fill in for missing
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## Read in ASL data
@@ -186,13 +190,25 @@ harvest_yr_sw_fishery_quad.df <- harvest.df %>%
   group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
   summarise(Harvest = sum(`N Catch`))
 
-# Foll up ASL to SW and Quad level, join with harvest
+# Roll up ASL to SW and Quad level, join with harvest
 harvest_ASL_join.df <- ASL.df %>% 
   filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
   filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
   count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
   full_join(harvest_yr_sw_fishery_quad.df, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
   replace_na(list(n = 0, Harvest = 0))  # replace NA in samples and harvest with 0
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Early Winter Selection ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Discussion with managers and PST folks indicated that they want as fine of scale data as possible
+# However, this is what we have for samples
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Early Winter" & Year_f == "2017") %>%
+  group_by(Quadrant) %>% 
+  summarise(Samples = sum(n)) %>% 
+  spread(Quadrant, Samples)
 
 # Plot samples and harvest together as proportions
 harvest_ASL_join.df %>% 
@@ -203,23 +219,13 @@ harvest_ASL_join.df %>%
   filter(Fishery == "Early Winter") %>% 
   ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
   geom_col() +
-  facet_grid(Quadrant ~ variable, scales = "free_y") +
+  facet_grid(Quadrant ~ variable, scales = "fixed") +
   ggtitle("Samples and Harvest by Stat Week and Quadrant for Early Winter AY18")
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#### Early Winter ####
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Discussion with managers and PST folks indicated that they want as fine of scale data as possible
-# However, this is what we have for samples
-harvest_ASL_join.df %>% 
-  filter(Fishery == "Early Winter" & Year_f == "2017") %>%
-  group_by(Quadrant) %>% 
-  summarise(Samples = sum(n)) %>% 
-  spread(Quadrant, Samples)
 
 # Thus the plan for extraction is to pick ~200 for 171 (NO) and run everything else
 # With the important caveat of subsampling in proportion to harvest by SW for each quadrant
+# Business rule is to take fish from within 2 SW on either side to fill in for missing
+
 
 #~~~~~~~~~~~~~~~~~~
 ## 171
@@ -290,7 +296,7 @@ EW_172_torun %>%
 harvest_ASL_join.df %>% 
   filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 173) %>% 
   arrange(`Stat Week`) %>% 
-  mutate(pHarvest = round(Harvest / sum(Harvest) * 40)) %>%  # if we want all samples proportional to harvest by SW
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 40)) %>%  # if we want 40 samples proportional to harvest by SW
   mutate(n_sufficeint = n >= pHarvest) %>% 
   mutate(n_remainings = n - pHarvest) %>% 
   mutate(n_extract = pmin(n, pHarvest))
@@ -321,7 +327,7 @@ EW_173_torun %>%
 harvest_ASL_join.df %>% 
   filter(Fishery == "Early Winter" & Year_f == "2017" & Quadrant == 174) %>% 
   arrange(`Stat Week`) %>% 
-  mutate(pHarvest = round(Harvest / sum(Harvest) * 64)) %>%  # if we want all samples proportional to harvest by SW
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 64)) %>%  # if we want 64 samples proportional to harvest by SW
   mutate(n_sufficeint = n >= pHarvest) %>% 
   mutate(n_remainings = n - pHarvest) %>% 
   mutate(n_extract = pmin(n, pHarvest))
@@ -344,8 +350,236 @@ EW_174_torun <- ASL.df %>%
 EW_174_torun %>% 
   count(`Stat Week`)
 
+
+#~~~~~~~~~~~~~~~~~~
 ## Create a single Early Winter Extraction data.frame
 EW_torun_ASL.df <- bind_rows(EW_171_torun, EW_172_torun, EW_173_torun, EW_174_torun)
 EW_torun_ASL.df %>% 
   count(Quadrant)
+
+dput(x = EW_torun_ASL.df, file = "Objects/EW_torun_ASL.df.txt")
+
+# Plot harvest vs. samples by SW for each Quad
+EW_torun_ASL.df %>% 
+  select(-n) %>% 
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  full_join(harvest_yr_sw_fishery_quad.df, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0)) %>%  # replace NA in samples and harvest with 0
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  mutate(n = n / sum(n), Harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -Year_f, -`Stat Week`, -Fishery, -Quadrant) %>% 
+  filter(Fishery == "Early Winter") %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  facet_grid(Quadrant ~ variable, scales = "fixed") +
+  ggtitle("Extraction and Harvest by Stat Week and Quadrant for Early Winter AY18")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Late Winter Selection ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Discussion with managers and PST folks indicated that they want as fine of scale data as possible
+# However, this is what we have for samples
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018") %>%
+  group_by(Quadrant) %>% 
+  summarise(Samples = sum(n)) %>% 
+  spread(Quadrant, Samples)
+
+# Plot samples and harvest together as proportions
+harvest_ASL_join.df %>% 
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  mutate(n = n / sum(n), Harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -Year_f, -`Stat Week`, -Fishery, -Quadrant) %>% 
+  filter(Fishery == "Late Winter") %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  facet_grid(Quadrant ~ variable, scales = "fixed") +
+  ggtitle("Samples and Harvest by Stat Week and Quadrant for Late Winter AY18")
+
+# Thus the plan for extraction is to pick all for 171 (NO) 100 for 172 (SO), and 200 each for 173 and 174 (NI, SI)
+# With the important caveat of subsampling in proportion to harvest by SW for each quadrant
+# Business rule is to take fish from within 2 SW on either side to fill in for missing
+
+
+#~~~~~~~~~~~~~~~~~~
+## 171
+# Run all 191 fish if possible, downgraded to 140 to get better temporal samples
+# What does proportional sampling look like?
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018" & Quadrant == 171) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 140)) %>%  # if we want 140 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Need to move some extra fish missing from SW 1 to 2; 3, 5, and 6 to 4; 8 to 7; 8 and 9 to 10.
+extraction_LW_171 <- data_frame('Stat Week' = 1:11,
+                                n = c(0, 8, 3, 36, 3, 16, 16, 15, 2, 26, 13)) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+LW_171_torun <- ASL.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018" & Quadrant == 171) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_LW_171, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+LW_171_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## 172
+# Subsample 100 fish, downgraded to 90 to get better temporal samples
+# What does proportional sampling look like?
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018" & Quadrant == 172) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 90)) %>%  # if we want 90 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Need to move some extra fish missing from SW 5 and 6 to 4; 7 to 8.
+extraction_LW_172 <- data_frame('Stat Week' = c(1:2, 4:11),
+                                n = c(5, 8, 14, 11, 6, 6, 12, 1, 15, 10)) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+LW_172_torun <- ASL.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018" & Quadrant == 172) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_LW_172, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+LW_172_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## 173
+# Subsample 200 fish, downgraded to 115 to get better temporal samples
+# What does proportional sampling look like?
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018" & Quadrant == 173) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 115)) %>%  # if we want 115 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Need to move some extra fish missing from SW 1 to 2; 3 to 4; 5 to 4 and 6; 7 to 6 and 8; 9 to 10
+extraction_LW_173 <- data_frame('Stat Week' = c(1:11),
+                                n = c(1, 1, 0, 17, 2, 31, 4, 10, 0, 19, 29)) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+LW_173_torun <- ASL.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018" & Quadrant == 173) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_LW_173, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+LW_173_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## 174
+# Subsample 140 fish
+# What does proportional sampling look like?
+harvest_ASL_join.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018" & Quadrant == 174) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 140)) %>%  # if we want 140 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Need to move some extra fish missing from SW 1 to 2; 3 to 4; 6 to 5; 7 to 8 and 9.
+extraction_LW_174 <- data_frame('Stat Week' = c(1:11),
+                                n = c(2, 17, 1, 12, 19, 1, 9, 17, 17, 26, 18)) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+LW_174_torun <- ASL.df %>% 
+  filter(Fishery == "Late Winter" & Year_f == "2018" & Quadrant == 174) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_LW_174, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+LW_174_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## Create a single Late Winter Extraction data.frame
+LW_torun_ASL.df <- bind_rows(LW_171_torun, LW_172_torun, LW_173_torun, LW_174_torun)
+LW_torun_ASL.df %>% 
+  count(Quadrant)
+
+dput(x = LW_torun_ASL.df, file = "Objects/LW_torun_ASL.df.txt")
+
+# Plot harvest vs. samples by SW for each Quad
+LW_torun_ASL.df %>% 
+  select(-n) %>% 
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  full_join(harvest_yr_sw_fishery_quad.df, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0)) %>%  # replace NA in samples and harvest with 0
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  mutate(n = n / sum(n), Harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -Year_f, -`Stat Week`, -Fishery, -Quadrant) %>% 
+  filter(Fishery == "Late Winter") %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  facet_grid(Quadrant ~ variable, scales = "fixed") +
+  ggtitle("Extraction and Harvest by Stat Week and Quadrant for Late Winter AY18")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Write Winter Extraction List ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Format into the Extraction List Template
+
+# Combine Early and Late Winter into one list
+Winter_torun_ASL.df <- bind_rows(EW_torun_ASL.df, LW_torun_ASL.df)
+
+# Confirm that all `Dna Specimen No` are 6 characters before splitting
+table(nchar(Winter_torun_ASL.df$`Dna Specimen No`))
+
+# Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples
+# So the `Dna Specimen No` isn't enough for me to figure out the whole 10 digit WGC number
+## First check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits)
+
+# WGC numbers from Iris' summary
+EW_WGC_4char <- readClipboard()
+length(EW_WGC_4char) == length(unique(EW_WGC_4char))
+
+# WGC numbers from Iris' summary
+LW_WGC_4char <- readClipboard()
+length(LW_WGC_4char) == length(unique(LW_WGC_4char))
+
+## Pull tissue collection info from OceanAK and join, need full 10 digit WGC number and Sample number
+# Check with Judy re: bogus FishID for KTROL18LW (some were 12 digit because the new importer couldn't handle the leading 100000XXXX barcodes)
+# Once Eric finishes, I will pull the tissue table for both sillys, join them by "FishID" and "Dna Specimen Id"
+# Once joined, I can get Silly, WGC #, Position, and FishID and create extraction list
 

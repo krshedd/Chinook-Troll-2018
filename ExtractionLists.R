@@ -5,10 +5,11 @@
 date()
 
 setwd("V:/Analysis/1_SEAK/Chinook/Mixture/SEAK18")
+source("C:/Users/krshedd/Documents/R/Functions.GCL.R")
 library(tidyverse)
 library(xlsx)
 
-dir.create("Extraction Lists")
+# dir.create("Extraction Lists")
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #### Winter ASL and Harvest Data ####
@@ -559,6 +560,7 @@ LW_torun_ASL.df %>%
 #### Write Winter Extraction List ####
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## Format into the Extraction List Template
+load_objects("Objects")
 
 # Combine Early and Late Winter into one list
 Winter_torun_ASL.df <- bind_rows(EW_torun_ASL.df, LW_torun_ASL.df)
@@ -568,7 +570,7 @@ table(nchar(Winter_torun_ASL.df$`Dna Specimen No`))
 
 # Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples
 # So the `Dna Specimen No` isn't enough for me to figure out the whole 10 digit WGC number
-## First check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits)
+# First check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits)
 
 # WGC numbers from Iris' summary
 EW_WGC_4char <- readClipboard()
@@ -578,8 +580,40 @@ length(EW_WGC_4char) == length(unique(EW_WGC_4char))
 LW_WGC_4char <- readClipboard()
 length(LW_WGC_4char) == length(unique(LW_WGC_4char))
 
-## Pull tissue collection info from OceanAK and join, need full 10 digit WGC number and Sample number
-# Check with Judy re: bogus FishID for KTROL18LW (some were 12 digit because the new importer couldn't handle the leading 100000XXXX barcodes)
-# Once Eric finishes, I will pull the tissue table for both sillys, join them by "FishID" and "Dna Specimen Id"
-# Once joined, I can get Silly, WGC #, Position, and FishID and create extraction list
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Pull tissue collection info from OceanAK and join, need full 10 digit WGC number and Sample number
+LOKI_tissue.df <- read_csv(file = "Associated Data/Winter Troll/GEN_SAMPLED_FISH_TISSUE.csv")
+
+# Subset for variables of interest
+LOKI_tissue.df <- LOKI_tissue.df %>% 
+  select(`Silly Code`, FK_FISH_ID, DNA_TRAY_CODE, DNA_TRAY_WELL_CODE, PK_TISSUE_TYPE)
+
+## Are all my extraction fish in the LOKI tissue table?
+table(Winter_torun_ASL.df$`Dna Specimen No` %in% LOKI_tissue.df$FK_FISH_ID)  # 1 FALSE
+
+# No, which one
+setdiff(Winter_torun_ASL.df$`Dna Specimen No`, LOKI_tissue.df$FK_FISH_ID)  # 549901
+
+# Check with Iris' summary to figure out what correct value is
+Winter_torun_ASL.df %>% 
+  filter(`Dna Specimen No` == 549901)  # KTN SW 49 Quad 174; should be 1000004599
+
+# Change value (both of these work)
+Winter_torun_ASL.df <- Winter_torun_ASL.df %>% 
+  mutate(`Dna Specimen No` = replace(`Dna Specimen No`, `Dna Specimen No` == 549901, 459901))
+
+Winter_torun_ASL.df <- Winter_torun_ASL.df %>% 
+  mutate(`Dna Specimen No` = recode(`Dna Specimen No`, `549901` = 459901L))
+
+## Join LOKI Tissue Table with ASL and format for Extraction List Template
+Winter_torun_extraction.df <- Winter_torun_ASL.df %>% 
+  left_join(LOKI_tissue.df, by = c(`Dna Specimen No` = "FK_FISH_ID")) %>% 
+  mutate(`WELL CODE` = str_pad(DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  mutate(`TISSUE TYPE` = str_replace(PK_TISSUE_TYPE, pattern = " Process", replacement = "")) %>% 
+  mutate(`TISSUE TYPE` = str_replace(`TISSUE TYPE`, pattern = " Clip", replacement = "")) %>% 
+  rename(SILLY = `Silly Code`, `SAMPLE #` = `Dna Specimen No`, `WGC BARCODE` = `DNA_TRAY_CODE`) %>% 
+  select(SILLY, `SAMPLE #`, `WGC BARCODE`, `WELL CODE`, `TISSUE TYPE`) %>% 
+  arrange(SILLY, `WGC BARCODE`, `WELL CODE`)
+
+write_csv(Winter_torun_extraction.df, path = "Extraction Lists/Winter_Extraction.csv")

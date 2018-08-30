@@ -5,7 +5,7 @@
 date()
 
 setwd("V:/Analysis/1_SEAK/Chinook/Mixture/SEAK18")
-source("C:/Users/krshedd/Documents/R/Functions.GCL.R")
+source("C:/Users/krshedd/R/Functions.GCL.R")
 library(tidyverse)
 library(xlsx)
 
@@ -617,3 +617,138 @@ Winter_torun_extraction.df <- Winter_torun_ASL.df %>%
   arrange(SILLY, `WGC BARCODE`, `WELL CODE`)
 
 write_csv(Winter_torun_extraction.df, path = "Extraction Lists/Winter_Extraction.csv")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### TBR D108/D111 ASL and Harvest Data ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Drift Gillnet
+### Only select TBR fish, even if this means cherry picking fish off of cards
+# Only large fish (>=660mm, SW 17-29, District 108 and 111)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in ASL data
+gill_ASL.tib <- read_csv(file = "ASL Data/20180829_D108_D111_Drift_Harvest - Detailed ASL Samples.csv")
+str(gill_ASL.tib, give.attr = FALSE)
+
+table(gill_ASL.tib$Harvest)
+table(gill_ASL.tib$`Stat Week`, gill_ASL.tib$District)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+TBR_gill_ASL.tib <- gill_ASL.tib %>%
+  filter(`Stat Week` >= 17 & `Stat Week` <= 29) %>%  # stat week 17-29
+  filter(`Average Length mm` >= 660) %>%  # large fish only
+  filter(!is.na(`Dna Specimen No`)) # has DNA sample
+  
+TBR_gill_ASL.tib %>% 
+  count(District)
+
+save_objects(objects = "TBR_gill_ASL.tib", path = "Objects")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Sport
+### Only select TBR fish, even if this means cherry picking fish off of cards
+# Only large fish (>=660mm, SW 17-29, District 108 and 111)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in ASL data
+sport_ASL.tib <- read_csv(file = "ASL Data/_2018_TBR_SEAK_SF_Genetic_AWL_31JUL18.csv")
+str(sport_ASL.tib, give.attr = FALSE)
+
+table(sport_ASL.tib$STATWEEK, sport_ASL.tib$DISTRICT)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+TBR_sport_ASL.tib <- sport_ASL.tib %>%
+  filter(DISTRICT == 111) %>%  # district 111
+  filter(STATWEEK >= 17 & STATWEEK <= 29) %>%  # stat week 17-29
+  filter(LENGTH >= 660) %>%  # large fish only
+  filter(!is.na(Whatman_Card)) # has DNA sample
+
+TBR_sport_ASL.tib %>% 
+  count(DISTRICT)
+
+save_objects(objects = "TBR_sport_ASL.tib", path = "Objects")
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Write TBR Extraction List ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Format into the Extraction List Template
+load_objects("Objects")
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Drift Gillnet
+# Confirm that all `Dna Specimen No` are 6 characters before splitting
+table(nchar(TBR_gill_ASL.tib$`Dna Specimen No`))
+
+# Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples
+# So the `Dna Specimen No` isn't enough for me to figure out the whole 10 digit WGC number
+# First check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits)
+
+# WGC numbers from Iris' summary
+TBR_gill_WGC_4char <- readClipboard()
+length(TBR_gill_WGC_4char) == length(unique(TBR_gill_WGC_4char))  # TRUE
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Pull tissue collection info from OceanAK and join, need full 10 digit WGC number and Sample number
+gill_LOKI_tissue.df <- read_csv(file = "Associated Data/TBR/GEN_SAMPLED_FISH_TISSUE.csv") %>% 
+  select(`Silly Code`, FK_FISH_ID, DNA_TRAY_CODE, DNA_TRAY_WELL_CODE, PK_TISSUE_TYPE) %>%  # subset
+  mutate(dna_specimen_no = as.numeric(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0"))))  # create 6 digit dna_specimen_no
+
+## Are all my extraction fish in the LOKI tissue table?
+table(TBR_gill_ASL.tib$`Dna Specimen No` %in% gill_LOKI_tissue.df$dna_specimen_no)  # 1 FALSE
+
+# No, which one
+setdiff(TBR_gill_ASL.tib$`Dna Specimen No`, gill_LOKI_tissue.df$dna_specimen_no)  # 433703
+
+## Join LOKI Tissue Table with ASL and format for Extraction List Template
+TBR_gill_extraction.tib <- TBR_gill_ASL.tib %>% 
+  inner_join(gill_LOKI_tissue.df, by = c(`Dna Specimen No` = "dna_specimen_no")) %>% 
+  mutate(`WELL CODE` = str_pad(DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  mutate(`TISSUE TYPE` = str_replace(PK_TISSUE_TYPE, pattern = " Process", replacement = "")) %>% 
+  mutate(`TISSUE TYPE` = str_replace(`TISSUE TYPE`, pattern = " Clip", replacement = "")) %>% 
+  rename(SILLY = `Silly Code`, `SAMPLE #` = `FK_FISH_ID`, `WGC BARCODE` = `DNA_TRAY_CODE`) %>% 
+  select(SILLY, `SAMPLE #`, `WGC BARCODE`, `WELL CODE`, `TISSUE TYPE`) %>% 
+  arrange(SILLY, `WGC BARCODE`, `WELL CODE`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Sport
+# Confirm that all Whatman Card are 10 characters before combining
+table(nchar(TBR_sport_ASL.tib$Whatman_Card))
+TBR_sport_ASL.tib <- TBR_sport_ASL.tib %>% 
+  mutate(Whatman_Card = str_pad(Whatman_Card, 10, "left", "0")) %>%  # pad WGC
+  mutate(SAMPLE_NO = str_pad(SAMPLE_NO, 2, "left", "0")) %>%  # pad well
+  unite(silly_source, c("Whatman_Card", "SAMPLE_NO"), sep = "_", remove = FALSE)  # silly_source
+  
+# Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Pull tissue collection info from OceanAK and join, need full 10 digit WGC number and Sample number
+sport_LOKI_tissue.df <- read_csv(file = "Associated Data/Sport/GEN_SAMPLED_FISH_TISSUE.csv") %>% 
+  select(`Silly Code`, FK_FISH_ID, DNA_TRAY_CODE, DNA_TRAY_WELL_CODE, PK_TISSUE_TYPE) %>%  # subset
+  mutate(DNA_TRAY_WELL_CODE = str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")) %>%  # pad well
+  unite(silly_source, c("DNA_TRAY_CODE", "DNA_TRAY_WELL_CODE"), sep = "_", remove = FALSE)  # silly_source
+
+## Are all my extraction fish in the LOKI tissue table?
+table(TBR_sport_ASL.tib$silly_source %in% sport_LOKI_tissue.df$silly_source)  # all TRUE
+
+## Join LOKI Tissue Table with ASL and format for Extraction List Template
+TBR_sport_extraction.tib <- TBR_sport_ASL.tib %>% 
+  inner_join(sport_LOKI_tissue.df, by = c("silly_source")) %>% 
+  mutate(`WELL CODE` = str_pad(DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  mutate(`TISSUE TYPE` = str_replace(PK_TISSUE_TYPE, pattern = " Process", replacement = "")) %>% 
+  mutate(`TISSUE TYPE` = str_replace(`TISSUE TYPE`, pattern = " Clip", replacement = "")) %>% 
+  rename(SILLY = `Silly Code`, `SAMPLE #` = `FK_FISH_ID`, `WGC BARCODE` = `DNA_TRAY_CODE`) %>% 
+  select(SILLY, `SAMPLE #`, `WGC BARCODE`, `WELL CODE`, `TISSUE TYPE`) %>% 
+  arrange(SILLY, `WGC BARCODE`, `WELL CODE`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Write joint extraction list
+TBR_extraction.tib <- bind_rows(TBR_gill_extraction.tib, TBR_sport_extraction.tib)
+write_csv(TBR_extraction.tib, path = "Extraction Lists/TBR_Extraction.csv")

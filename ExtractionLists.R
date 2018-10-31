@@ -3,11 +3,12 @@
 # Kyle Shedd
 # Created Wed Apr 18 15:02:57 2018
 date()
+rm(list = ls(all.names = TRUE))
 
 setwd("V:/Analysis/1_SEAK/Chinook/Mixture/SEAK18")
 source("C:/Users/krshedd/R/Functions.GCL.R")
 library(tidyverse)
-library(xlsx)
+library(lubridate)
 
 # dir.create("Extraction Lists")
 
@@ -752,3 +753,901 @@ TBR_sport_extraction.tib <- TBR_sport_ASL.tib %>%
 ## Write joint extraction list
 TBR_extraction.tib <- bind_rows(TBR_gill_extraction.tib, TBR_sport_extraction.tib)
 write_csv(TBR_extraction.tib, path = "Extraction Lists/TBR_Extraction.csv")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Summer ASL and Harvest Data ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+date()  # Fri Oct 26 07:26:11 2018
+# Making lists for Summer 1 / 2 before Spring because summer is still by quad
+# thus, it is easier to deal with than Spring (by Stat Area!)
+
+# Planning to run each Quad as it's own mixture and stratify from there
+# Business rule is to take fish from within 2 SW on either side to fill in for missing
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in ASL data
+asl_summer <- read_csv(file = "ASL Data/20181025_Harvest - Detailed ASL Samples.csv")
+str(asl_summer, give.attr = FALSE)  # District = Quadrant
+problems(asl_summer)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+# Filter for just Traditional and Terminal, only DNA sampled
+asl_summer %>% 
+  count(Harvest)
+
+asl_summer <- asl_summer %>% 
+  filter(Harvest %in% c("Spring Troll Fishery", "Traditional State Managed Fisheries")) %>% 
+  filter(!is.na(`Dna Specimen No`))
+  
+asl_summer %>% 
+  count(Harvest, District) %>% 
+  spread(District, n)
+
+# Year as factor, rename Quadrant
+asl_summer <- asl_summer %>% 
+  mutate(Year_f = factor(Year)) %>% 
+  rename(Quadrant = District)
+
+# Create a variable for Fishery
+# Investigate sample date for spring to determine May/June cutoff
+asl_summer %>% 
+  filter(Harvest == "Spring Troll Fishery") %>% 
+  count(`Sample Date`) %>% 
+  print(n = 44)
+# Based on spring openings, I know that the fishery was closed 5/31-6/4 so fish sampled 6/1 where harvested in May
+
+asl_summer %>% 
+  filter(Harvest == "Traditional State Managed Fisheries") %>% 
+  count(`Stat Week`) %>% 
+  print(n = 100)
+
+asl_summer <- asl_summer %>% 
+  mutate(Fishery = case_when(Harvest == "Spring Troll Fishery" & `Sample Date` <= "2018-06-01" ~ "Spring 1",
+                             Harvest == "Spring Troll Fishery" & `Sample Date` > "2018-06-01" ~ "Spring 2",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` <= 18 ~ "Late Winter",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 41 ~ "Early Winter",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 26 & `Stat Week` <= 31 ~ "Summer Ret 1",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 32 & `Stat Week` <= 36 ~ "Summer Ret 2")) %>% 
+  mutate(Fishery = factor(Fishery, levels = c("Late Winter", "Spring 1", "Spring 2", "Summer Ret 1", "Summer Ret 2", "Early Winter")))
+
+asl_summer %>% 
+  filter(!is.na(`Dna Specimen No`)) %>% 
+  count(Fishery, Quadrant) %>% 
+  spread(Quadrant, n, fill = 0)
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize ASL data
+# Plot samples by Stat Week (all Quadrants)
+# Using ggplot2 `geom_bar` (we know that there is 1 row per DNA sample)
+asl_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  filter(!is.na(`Dna Specimen No`)) %>% 
+  ggplot(aes(x = `Stat Week`, fill = Fishery)) +
+  geom_bar() +
+  facet_wrap(~ Year_f) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Stat Week for Summer AY18")
+
+# Plot samples by Stat Week and Quadrant
+asl_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  filter(!is.na(`Dna Specimen No`)) %>% 
+  ggplot(aes(x = `Stat Week`, fill = Fishery)) +
+  geom_bar() +
+  facet_grid(Quadrant ~ Year_f) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Stat Week and Quadrant for Summer AY18")
+
+# Table of Samples by Fishery/Quadrant
+asl_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, Quadrant, Fishery) %>% 
+  spread(Quadrant,  n)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in Harvest data
+# By Period and Quad
+harvest_summer_per_quad <- read_csv(file = "Harvest Data/CE005859.csv", skip = 22)
+str(harvest_summer_per_quad, give.attr = FALSE)  # Area Value = District, Time Value = Stat Week
+problems(harvest_summer_per_quad)
+
+harvest_summer_per_quad %>% 
+  filter(`Time Value` >= 4 & `Time Value` < 6) %>% 
+  group_by(`Time Value`, `Area Value`) %>% 
+  summarize(harvest = sum(`N Catch`)) %>% 
+  spread(`Area Value`, harvest, fill = 0)
+
+# By Stat Week and District
+harvest_summer <- read_csv(file = "Harvest Data/CE005860.csv", skip = 22)
+str(harvest_summer, give.attr = FALSE)  # Area Value = District, Time Value = Stat Week
+problems(harvest_summer)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate harvest data
+# Year as factor, rename Stat Week, rename District
+harvest_summer <- harvest_summer %>% 
+  mutate(Year_f = factor(Year)) %>% 
+  rename("Stat Week" = `Time Value`, District = `Area Value`) %>% 
+  replace_na(list(`N Catch` = 0))
+
+# Create a variable for Fishery
+harvest_summer %>% 
+  filter(Harvest == "TRAD") %>% 
+  count(`Stat Week`) %>% 
+  print(n = 100)
+
+harvest_summer <- harvest_summer %>% 
+  mutate(Fishery = case_when(Harvest == "SP TROLL" & `Stat Week` <= 22 ~ "Spring 1",
+                             Harvest == "SP TROLL" & `Stat Week` > 22 ~ "Spring 2",
+                             Harvest == "TRAD" & `Stat Week` <= 18 ~ "Late Winter",
+                             Harvest == "TRAD" & `Stat Week` >= 41 ~ "Early Winter",
+                             Harvest == "TRAD" & `Stat Week` >= 26 & `Stat Week` <= 31 ~ "Summer Ret 1",
+                             Harvest == "TRAD" & `Stat Week` >= 32 & `Stat Week` <= 36 ~ "Summer Ret 2")) %>% 
+  mutate(Fishery = factor(Fishery, levels = c("Late Winter", "Spring 1", "Spring 2", "Summer Ret 1", "Summer Ret 2", "Early Winter")))
+
+# Create a variable for Quadrant
+harvest_summer <- harvest_summer %>% 
+  mutate(Quadrant = case_when(District %in% c(113, 114, 116, 154, 156, 157) | District >= 181 ~ 171,
+                              District %in% c(103, 104, 152) ~ 172,
+                              District %in% c(109, 110, 111, 112, 115) ~ 173,
+                              District %in% c(101, 102, 105, 106, 107, 108) ~ 174))
+
+# Table of Harvest by Fishery/Quadrant
+harvest_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  group_by(Year_f, Quadrant, Fishery) %>% 
+  summarize(harvest = sum(`N Catch`)) %>% 
+  spread(Quadrant,  harvest, fill = 0)
+
+# Verify that I summarized Stat Week/District correctly
+harvest_summer_per_quad %>% 
+  filter(`Time Value` >= 4 & `Time Value` < 6) %>% 
+  group_by(`Time Value`, `Area Value`) %>% 
+  summarize(harvest = sum(`N Catch`)) %>% 
+  spread(`Area Value`, harvest, fill = 0)
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize Harvest Data
+# Plot samples by Stat Week (all Quadrants)
+# Using ggplot2 `geom_col` to plot harvest (identity)
+harvest_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  group_by(Year_f, `Stat Week`, Fishery) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = Harvest, fill = Fishery)) +
+  geom_col() +
+  facet_wrap(~ Year_f) +
+  ggtitle("Harvest by Stat Week for Summer AY18")
+
+# Plot samples by Stat Week and Quadrant
+# Using ggplot2 `geom_col` to plot harvest (identity)
+harvest_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = Harvest, fill = Fishery)) +
+  geom_col() +
+  facet_grid(Quadrant ~ Year_f) +
+  ggtitle("Harvest by Stat Week and Quadrant for Summer AY18")
+
+# Table of Harvest by Fishery/Quadrant
+harvest_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  spread(Quadrant, Harvest)
+
+# Determine max harvest by Fishery/District/Stat Week for heatmaps
+max_sw_harvest <- as.numeric(harvest_summer %>% 
+                               filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+                               summarise_at(vars(`N Catch`), max))
+
+# Heatmap of Harvest by Stat Week and District for Summer 1
+harvest_summer %>% 
+  mutate(District = factor(x = District, levels = sort(unique(District)))) %>% 
+  filter(Fishery == "Summer Ret 1") %>%
+  group_by(Year_f, `Stat Week`, Fishery, District) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = District, fill = Harvest, label = Harvest)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "black", na.value = "white", limits = c(0, max_sw_harvest)) +
+  scale_x_continuous(breaks = 27:29) +
+  theme_classic() +
+  geom_text(color = "red") +
+  ggtitle("Summer Ret 1 - Harvest by Stat Week and District")
+
+# Heatmap of Harvest by Stat Week and District for Summer 2
+harvest_summer %>% 
+  mutate(District = factor(x = District, levels = sort(unique(District)))) %>% 
+  filter(Fishery == "Summer Ret 2") %>%
+  group_by(Year_f, `Stat Week`, Fishery, District) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = District, fill = Harvest, label = Harvest)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "black", na.value = "white", limits = c(0, max_sw_harvest)) +
+  scale_x_continuous(breaks = 33:34) +
+  theme_classic() +
+  geom_text(color = "red") +
+  ggtitle("Summer Ret 2 - Harvest by Stat Week and District")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Join ASL and Harvest data by Quad by SW
+# Roll up harvest to Quad level
+harvest_yr_sw_fishery_quad <- harvest_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  summarise(Harvest = sum(`N Catch`))
+
+# Roll up ASL to SW and Quad level, join with harvest
+join_summer <- asl_summer %>% 
+  filter(Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  full_join(harvest_yr_sw_fishery_quad, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0))  # replace NA in samples and harvest with 0
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Summer Ret 1 Selection ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Discussion with managers and PST folks indicated that they are content with quad level info for summer
+# The BoF isn't going to mess with summer
+# However, this is what we have for samples
+join_summer %>% 
+  filter(Fishery == "Summer Ret 1") %>%
+  group_by(Quadrant) %>% 
+  summarise(Samples = sum(n)) %>% 
+  spread(Quadrant, Samples)
+
+# Plot samples and harvest together as proportions
+join_summer %>% 
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  mutate(n = n / sum(n), Harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -Year_f, -`Stat Week`, -Fishery, -Quadrant) %>% 
+  filter(Fishery == "Summer Ret 1") %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  facet_grid(Quadrant ~ variable, scales = "fixed") +
+  ggtitle("Samples and Harvest by Stat Week and Quadrant for Summer Ret 1 AY18")
+
+# Thus the plan for extraction is to pick ~380 for 171 (NO)
+# With the important caveat of subsampling in proportion to harvest by SW for each quadrant
+# Business rule is to take fish from within 2 SW on either side to fill in for missing
+
+
+#~~~~~~~~~~~~~~~~~~
+## 171
+# Subsample 380 fish
+# What does proportional sampling look like?
+join_summer %>% 
+  filter(Fishery == "Summer Ret 1" & Quadrant == 171) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 380)) %>%  # if we want 380 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+extraction_SU1_171 <- tribble(
+  ~`Stat Week`, ~n,
+  27,           198,
+  28,           182
+) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+SU1_171_torun <- asl_summer %>% 
+  filter(Fishery == "Summer Ret 1" & Quadrant == 171) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_SU1_171, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+SU1_171_torun %>% 
+  count(`Stat Week`)
+
+#~~~~~~~~~~~~~~~~~~
+## 172
+# Subsample 220 fish
+# What does proportional sampling look like?
+join_summer %>% 
+  filter(Fishery == "Summer Ret 1" & Quadrant == 172) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 220)) %>%  # if we want 220 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+extraction_SU1_172 <- tribble(
+  ~`Stat Week`, ~n,
+  27,           87,
+  28,           133
+) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+SU1_172_torun <- asl_summer %>% 
+  filter(Fishery == "Summer Ret 1" & Quadrant == 172) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_SU1_172, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+SU1_172_torun %>% 
+  count(`Stat Week`)
+
+#~~~~~~~~~~~~~~~~~~
+## 173
+# Subsample 50 fish
+# What does proportional sampling look like?
+join_summer %>% 
+  filter(Fishery == "Summer Ret 1" & Quadrant == 173) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 50)) %>%  # if we want 50 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+extraction_SU1_173 <- tribble(
+  ~`Stat Week`, ~n,
+  27,           29,
+  28,           21
+) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+SU1_173_torun <- asl_summer %>% 
+  filter(Fishery == "Summer Ret 1" & Quadrant == 173) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_SU1_173, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+SU1_173_torun %>% 
+  count(`Stat Week`)
+
+#~~~~~~~~~~~~~~~~~~
+## 174
+# Subsample 50 fish
+# What does proportional sampling look like?
+join_summer %>% 
+  filter(Fishery == "Summer Ret 1" & Quadrant == 174) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 50)) %>%  # if we want 50 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+extraction_SU1_174 <- tribble(
+  ~`Stat Week`, ~n,
+  27,           20,
+  28,           30
+) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+SU1_174_torun <- asl_summer %>% 
+  filter(Fishery == "Summer Ret 1" & Quadrant == 174) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_SU1_174, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+SU1_174_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## Create a single Early Winter Extraction data.frame
+SU1_torun_asl <- bind_rows(SU1_171_torun, SU1_172_torun, SU1_173_torun, SU1_174_torun)
+SU1_torun_asl %>% 
+  count(Quadrant)
+
+save_objects("SU1_torun_asl", path = "Objects")
+
+# Plot harvest vs. samples by SW for each Quad
+SU1_torun_asl %>% 
+  select(-n) %>% 
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  full_join(harvest_yr_sw_fishery_quad, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0)) %>%  # replace NA in samples and harvest with 0
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  mutate(n = n / sum(n), Harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -Year_f, -`Stat Week`, -Fishery, -Quadrant) %>% 
+  filter(Fishery == "Summer Ret 1") %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  facet_grid(Quadrant ~ variable, scales = "fixed") +
+  ggtitle("Extraction and Harvest by Stat Week and Quadrant for Summer Ret 1 AY18")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Summer Ret 2 Selection ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Discussion with managers and PST folks indicated that they are content with quad level info for summer
+# The BoF isn't going to mess with summer
+# However, this is what we have for samples
+join_summer %>% 
+  filter(Fishery == "Summer Ret 2") %>%
+  group_by(Quadrant) %>% 
+  summarise(Samples = sum(n)) %>% 
+  spread(Quadrant, Samples)
+
+# Plot samples and harvest together as proportions
+join_summer %>% 
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  mutate(n = n / sum(n), Harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -Year_f, -`Stat Week`, -Fishery, -Quadrant) %>% 
+  filter(Fishery == "Summer Ret 2") %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  facet_grid(Quadrant ~ variable, scales = "fixed") +
+  ggtitle("Samples and Harvest by Stat Week and Quadrant for Summer Ret 2 AY18")
+
+# Thus the plan for extraction is to pick ~220 for 171 (NO)
+# With the important caveat of subsampling in proportion to harvest by SW for each quadrant
+# Business rule is to take fish from within 2 SW on either side to fill in for missing
+
+
+#~~~~~~~~~~~~~~~~~~
+## 171
+# Subsample 220 fish
+# What does proportional sampling look like?
+join_summer %>% 
+  filter(Fishery == "Summer Ret 2" & Quadrant == 171) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 220)) %>%  # if we want 220 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+extraction_SU2_171 <- tribble(
+  ~`Stat Week`, ~n,
+  33,           96,
+  34,           124
+) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+SU2_171_torun <- asl_summer %>% 
+  filter(Fishery == "Summer Ret 2" & Quadrant == 171) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_SU2_171, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+SU2_171_torun %>% 
+  count(`Stat Week`)
+
+#~~~~~~~~~~~~~~~~~~
+## 172
+# Subsample 120 fish
+# What does proportional sampling look like?
+join_summer %>% 
+  filter(Fishery == "Summer Ret 2" & Quadrant == 172) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 120)) %>%  # if we want 120 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+extraction_SU2_172 <- tribble(
+  ~`Stat Week`, ~n,
+  33,           31,
+  34,           89
+) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+SU2_172_torun <- asl_summer %>% 
+  filter(Fishery == "Summer Ret 2" & Quadrant == 172) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_SU2_172, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+SU2_172_torun %>% 
+  count(`Stat Week`)
+
+#~~~~~~~~~~~~~~~~~~
+## 173
+# Subsample 50 fish
+# What does proportional sampling look like?
+join_summer %>% 
+  filter(Fishery == "Summer Ret 2" & Quadrant == 173) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 50)) %>%  # if we want 50 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+extraction_SU2_173 <- tribble(
+  ~`Stat Week`, ~n,
+  33,           18,
+  34,           32
+) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+SU2_173_torun <- asl_summer %>% 
+  filter(Fishery == "Summer Ret 2" & Quadrant == 173) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_SU2_173, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+SU2_173_torun %>% 
+  count(`Stat Week`)
+
+#~~~~~~~~~~~~~~~~~~
+## 174
+# Subsample 50 fish
+# What does proportional sampling look like?
+join_summer %>% 
+  filter(Fishery == "Summer Ret 2" & Quadrant == 174) %>% 
+  arrange(`Stat Week`) %>% 
+  mutate(pHarvest = round(Harvest / sum(Harvest) * 50)) %>%  # if we want 50 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= pHarvest) %>% 
+  mutate(n_remainings = n - pHarvest) %>% 
+  mutate(n_extract = pmin(n, pHarvest))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+extraction_SU2_174 <- tribble(
+  ~`Stat Week`, ~n,
+  33,           19,
+  34,           31
+) %>% 
+  filter(n > 0)  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+# Randomly pick fish
+SU2_174_torun <- asl_summer %>% 
+  filter(Fishery == "Summer Ret 2" & Quadrant == 174) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_SU2_174, by = "Stat Week") %>% 
+  mutate(Sample = map2(data, n, sample_n)) %>% 
+  unnest(Sample)
+
+# Verify picked fish
+SU2_174_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## Create a single Early Winter Extraction data.frame
+SU2_torun_asl <- bind_rows(SU2_171_torun, SU2_172_torun, SU2_173_torun, SU2_174_torun)
+SU2_torun_asl %>% 
+  count(Quadrant)
+
+save_objects("SU2_torun_asl", path = "Objects")
+
+# Plot harvest vs. samples by SW for each Quad
+SU2_torun_asl %>% 
+  select(-n) %>% 
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  full_join(harvest_yr_sw_fishery_quad, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0)) %>%  # replace NA in samples and harvest with 0
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  mutate(n = n / sum(n), Harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -Year_f, -`Stat Week`, -Fishery, -Quadrant) %>% 
+  filter(Fishery == "Summer Ret 2") %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  facet_grid(Quadrant ~ variable, scales = "fixed") +
+  ggtitle("Extraction and Harvest by Stat Week and Quadrant for Summer Ret 2 AY18")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Write Summer Extraction List ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Format into the Extraction List Template
+load_objects("Objects")
+
+# Combine Early and Late Winter into one list
+summer_torun_asl <- bind_rows(SU1_torun_asl, SU2_torun_asl)
+
+# Confirm that all `Dna Specimen No` are 6 characters before splitting
+table(nchar(summer_torun_asl$`Dna Specimen No`))
+
+summer_torun_asl %>% 
+  filter(nchar(`Dna Specimen No`) == 5) %>% 
+  select(`Stat Week`, Fishery, Quadrant, `Dna Specimen No`)
+
+# Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples
+# So the `Dna Specimen No` isn't enough for me to figure out the whole 10 digit WGC number
+# First check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits)
+
+summer_torun_asl %>% 
+  mutate(WGC_4digit = str_sub(`Dna Specimen No`, 1, 4)) %>%  # get last 4 digits of WGC
+  group_by(WGC_4digit) %>%  # group by those 4 digits
+  summarise(count = n_distinct(`Sample Date`)) %>%  # count unique sample dates
+  summarise(count = max(count)) # what is the maximum number of sample dates per unique 4 digit WGC
+# good to go
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Pull tissue collection info from OceanAK and join, need full 10 digit WGC number and Sample number
+loki_tissue_summer <- read_csv(file = "Associated Data/Summer Troll/GEN_SAMPLED_FISH_TISSUE_KTROL18SU.csv")
+
+# Subset for variables of interest
+loki_tissue_summer <- loki_tissue_summer %>% 
+  filter(is.na(IS_MISSING_PAIRED_DATA_EXISTS)) %>%  # make sure we aren't issing the tissue
+  select(`Silly Code`, FK_FISH_ID, DNA_TRAY_CODE, DNA_TRAY_WELL_CODE, PK_TISSUE_TYPE) %>% 
+  mutate(WGC_4digit = str_sub(DNA_TRAY_CODE, 7, 10)) %>% 
+  mutate(WGC_2digit_pos = str_pad(string = DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  unite(dna_specimen_no, c(WGC_4digit, WGC_2digit_pos), sep = '', remove = FALSE) %>% 
+  mutate(dna_specimen_no = as.integer(dna_specimen_no))
+
+#~~~~~~~~~~~~~~~~~~
+## Are all my extraction fish in the LOKI tissue table?
+table(summer_torun_asl$`Dna Specimen No` %in% loki_tissue_summer$dna_specimen_no)  # 6 FALSE
+
+# No, which ones are missing
+missing_fish <- sort(setdiff(summer_torun_asl$`Dna Specimen No`, loki_tissue_summer$dna_specimen_no))
+
+summer_torun_asl %>% 
+  filter(`Dna Specimen No` %in% missing_fish) %>% 
+  select(Fishery, Quadrant, `Stat Week`, `Dna Specimen No`)
+
+# What is the max sample n on each of these cards?
+loki_tissue_summer %>% 
+  filter(WGC_4digit %in% as.character(str_sub(missing_fish, 1, 4))) %>% 
+  group_by(WGC_4digit) %>% 
+  summarise(max = max(WGC_2digit_pos))
+
+missing_fish
+
+# Attempt to pick the "next fish" or "previous fish"
+new_fish <- c(592007, 754622, 814304, 872501, 872505, 967322)
+missing_fish - new_fish # great, no typos
+
+# Make sure these "new fish" are not already in the extraction list
+intersect(new_fish, summer_torun_asl$`Dna Specimen No`) # if not zero, modify `new_fish`
+
+# Make sure these "new fish" exist in LOKI
+setdiff(new_fish, loki_tissue_summer$dna_specimen_no) # if not zero, modify `new_fish`
+
+# New fish asl
+asl_summer_new_fish <- asl_summer %>% 
+  filter(`Dna Specimen No` %in% new_fish)
+
+#~~~~~~~~~~~~~~~~~~
+## Update summer_torun_asl
+summer_torun_asl_mod <- summer_torun_asl %>% 
+  filter(!`Dna Specimen No` %in% missing_fish) %>% 
+  bind_rows(asl_summer_new_fish)
+
+# Make sure the "missing column is fine
+table(summer_torun_asl_mod$n, useNA = "always")
+
+# Verify that we have the correct numbers of fish per fishery/quadrant
+summer_torun_asl_mod %>% 
+  count(Fishery, Quadrant) %>% 
+  spread(Quadrant, nn, fill = 0)
+
+# Verify that we have the correct numbers of fish per statweek/quadrant
+summer_torun_asl_mod %>% 
+  count(`Stat Week`, Quadrant) %>% 
+  spread(`Stat Week`, nn, fill = 0)
+
+#~~~~~~~~~~~~~~~~~~
+## Join LOKI Tissue Table with ASL and format for Extraction List Template
+summer_torun_extraction <- summer_torun_asl_mod %>% 
+  left_join(loki_tissue_summer, by = c(`Dna Specimen No` = "dna_specimen_no")) %>% 
+  mutate(`WELL CODE` = str_pad(DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  mutate(`TISSUE TYPE` = str_replace(PK_TISSUE_TYPE, pattern = " Process", replacement = "")) %>% 
+  mutate(`TISSUE TYPE` = str_replace(`TISSUE TYPE`, pattern = " Clip", replacement = "")) %>% 
+  rename(SILLY = `Silly Code`, `SAMPLE #` = FK_FISH_ID, `WGC BARCODE` = `DNA_TRAY_CODE`) %>% 
+  select(SILLY, `SAMPLE #`, `WGC BARCODE`, `WELL CODE`, `TISSUE TYPE`) %>% 
+  arrange(SILLY, `WGC BARCODE`, `WELL CODE`)
+
+write_csv(summer_torun_extraction, path = "Extraction Lists/Summer_Extraction.csv")
+
+summer_torun_extraction %>% 
+  count(SILLY, `TISSUE TYPE`)
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Spring ASL and Harvest Data ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# UPDATE
+# Planning to run each Quad as it's own mixture and stratify from there
+# Business rule is to take fish from within 2 SW on either side to fill in for missing
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in ASL data
+spring_ASL <- read_csv(file = "ASL Data/2018 Spring Troll Chinook ASLDist Subdistrict.csv")
+str(spring_ASL, give.attr = FALSE)  # District = Quadrant
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+# Year as factor and create a variable for Fishery
+spring_ASL <- spring_ASL %>% 
+  mutate(Year_f = factor(Year)) %>% 
+  mutate(Fishery = case_when(Harvest == "Spring Troll Fishery" ~ "Spring",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` <= 18 ~ "Late Winter",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 41 ~ "Early Winter",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 26 & `Stat Week` <= 31 ~ "Summer Ret 1",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 32 & `Stat Week` <= 36 ~ "Summer Ret 2")) %>% 
+  mutate(Fishery = factor(Fishery, levels = c("Late Winter", "Spring", "Summer Ret 1", "Summer Ret 2", "Early Winter"))) %>% 
+  # mutate(Month = month(mdy(`Sample Date`), label = TRUE, abbr = FALSE))  # update! anything SW22 and less is May
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize ASL data
+# Plot samples by Stat Week (all Quadrants)
+# Using ggplot2 `geom_bar` (we know that there is 1 row per DNA sample)
+spring_ASL %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>% 
+  ggplot(aes(x = `Stat Week`, fill = Fishery)) +
+  geom_bar() +
+  facet_grid(Quadrant ~ Year) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Stat Week for Spring AY18")
+
+
+# Plot samples by Stat Week and Quadrant
+# Using ggplot2 `geom_col` to plot harvest (identity)
+spring_ASL %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>% 
+  ggplot(aes(x = `Stat Week`, fill = Fishery)) +
+  geom_bar() +
+  facet_grid(Quadrant ~ Month) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Stat Week for Spring AY18")
+
+# Table of Samples by Fishery/Quadrant
+spring_ASL %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, Quadrant, Fishery, Month) %>% 
+  spread(Quadrant,  n)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in Harvest data
+harvest <- read_csv(file = "Harvest Data/CE005837.csv", skip = 22)
+str(harvest, give.attr = FALSE)  # Area Value = District, Time Value = Stat Week
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate harvest data
+# Year as factor, rename Stat Week, rename District
+harvest <- harvest %>% 
+  mutate(Year_f = factor(Year)) %>% 
+  rename("Stat Week" = `Time Value`, "Stat Area" = `Area Value`)
+
+# Create a variable for Fishery
+harvest <- harvest %>% 
+  mutate(Fishery = case_when(Harvest == "SP TROLL" ~ "Spring",
+                             Harvest == "TRAD" & `Stat Week` <= 18 ~ "Late Winter",
+                             Harvest == "TRAD" & `Stat Week` >= 41 ~ "Early Winter",
+                             Harvest == "TRAD" & `Stat Week` >= 26 & `Stat Week` <= 31 ~ "Summer Ret 1",
+                             Harvest == "TRAD" & `Stat Week` >= 32 & `Stat Week` <= 36 ~ "Summer Ret 2")) %>% 
+  mutate(Fishery = factor(Fishery, levels = c("Late Winter", "Spring", "Summer Ret 1", "Summer Ret 2", "Early Winter")))
+
+# Create a variable for District/SubDistrict
+harvest <- harvest %>% 
+  mutate(District = as.integer(str_sub(`Stat Area`, 1, 3)))
+
+# Create a variable for Quadrant
+harvest <- harvest %>% 
+  mutate(Quadrant = case_when(District %in% c(113, 114, 116, 154, 156, 157) | District >= 181 ~ 171,
+                              District %in% c(103, 104, 152) ~ 172,
+                              District %in% c(109, 110, 111, 112, 115) ~ 173,
+                              District %in% c(101, 102, 105, 106, 107, 108) ~ 174))
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize Harvest Data
+# Plot samples by Stat Week (all Quadrants)
+# Using ggplot2 `geom_col` to plot harvest (identity)
+harvest %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  group_by(Year_f, `Stat Week`, Fishery) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = Harvest, fill = Fishery)) +
+  geom_col() +
+  facet_grid(~ Year_f) +
+  ggtitle("Harvest by Stat Week for Spring AY18")
+
+# Plot samples by Stat Week and Quadrant
+# Using ggplot2 `geom_col` to plot harvest (identity)
+harvest %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = Harvest, fill = Fishery)) +
+  geom_col() +
+  facet_grid(Quadrant ~ Year_f) +
+  ggtitle("Harvest by Stat Week and Quadrant for Spring AY18")
+
+# Table of Harvest by Fishery/Quadrant
+harvest %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  group_by(Year_f, Fishery, Quadrant) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  spread(Quadrant, Harvest)
+
+# Determine max harvest by Fishery/District/Stat Week for heatmaps
+max_sw_harvest <- as.numeric(harvest %>% 
+                               filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
+                               summarise_at(vars(`N Catch`), max))
+
+# Heatmap of Harvest by Stat Week and District for Early Winter
+harvest %>% 
+  mutate(District = factor(x = District, levels = sort(unique(District)))) %>% 
+  filter(Fishery == "Early Winter" & Year == "2017") %>%
+  group_by(Year_f, `Stat Week`, Fishery, District) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = District, fill = Harvest, label = Harvest)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "black", na.value = "white", limits = c(0, max_sw_harvest)) +
+  scale_x_continuous(breaks = 41:53) +
+  theme_classic() +
+  geom_text(color = "red") +
+  ggtitle("Early Winter - Harvest by Stat Week and District")
+
+# Heatmap of Harvest by Stat Week and District for Late Winter
+harvest %>% 
+  mutate(District = factor(x = District, levels = sort(unique(District)))) %>% 
+  filter(Fishery == "Late Winter" & Year == "2018") %>%
+  group_by(Year_f, `Stat Week`, Fishery, District) %>% 
+  summarise(Harvest = sum(`N Catch`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = District, fill = Harvest, label = Harvest)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "black", na.value = "white", limits = c(0, max_sw_harvest)) +
+  scale_x_continuous(breaks = 1:18) +
+  theme_classic() +
+  geom_text(color = "red") +
+  ggtitle("Late Winter - Harvest by Stat Week and District")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Join ASL and Harvest data by Quad by SW
+# Roll up harvest to Quad level
+harvest_yr_sw_fishery_quad.df <- harvest.df %>% 
+  filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
+  group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  summarise(Harvest = sum(`N Catch`))
+
+# Roll up ASL to SW and Quad level, join with harvest
+harvest_ASL_join.df <- ASL.df %>% 
+  filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
+  full_join(harvest_yr_sw_fishery_quad.df, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0))  # replace NA in samples and harvest with 0

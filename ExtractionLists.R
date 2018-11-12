@@ -1651,3 +1651,155 @@ harvest_ASL_join.df <- ASL.df %>%
   count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
   full_join(harvest_yr_sw_fishery_quad.df, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
   replace_na(list(n = 0, Harvest = 0))  # replace NA in samples and harvest with 0
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Sport ASL and Harvest Data ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+date()  # Mon Nov 12 10:23:29 2018
+# Making lists for Sport (Origins) before Spring because sport is more 
+# straightforward than Spring. Also, if we do sport first, we'll know how many 
+# EXTRA fish we'll get for Spring, since we aren't going to hit our 2.8K goal 
+# for sport
+
+# Planning to run same mixtures as previous years and stratify from there
+# Sitka
+# Craig
+# Ketchikan
+# Petersburg/Wrangel (note some fish were already run for TBR)
+# Outisde through biweek 13 (subset of Sitka and Craig)
+# Outside post biweek 13 (subset of Sitka and Craig)
+
+
+# Business rule is to take fish from within 1 biweek on either side to fill in 
+# for missing
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in ASL data
+asl_sport <- read_csv(file = "ASL Data/_2018_SEAK_SF_Whatman_AWL_10OCT18.csv")
+str(asl_sport, give.attr = FALSE)  # District = Quadrant
+problems(asl_sport)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+# Filter for just species 410 (legal), only DNA sampled
+asl_sport <- asl_sport %>% 
+  filter(SPECCODE == 410) %>% 
+  filter(!is.na(SAMPLE_NO))
+
+# Make SITE a factor for ordering purposes
+asl_sport <- asl_sport %>% 
+  mutate(site = factor(SITE, c("JUNEAU", "KETCHIKAN", "WRANGELL", "PETERSBURG", "SITKA", "CRAIG_KLAWOCK", "GUSTAVUS", "ELFIN_COVE", "YAKUTAT"))) %>% 
+  rename(biweek = BIWEEK)
+
+# Pivot harvest by biweek and site
+asl_sport %>% 
+  count(biweek, site) %>% 
+  spread(site, n, fill = 0)
+
+
+# Create a variable for Fishery
+asl_sport <- asl_sport %>% 
+  mutate(fishery = case_when(site == "KETCHIKAN" ~ "KTN",
+                             site %in% c("PETERSBURG", "WRANGELL") ~ "PB-WR",
+                             site == "JUNEAU" ~ "Inside",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek <= 13 ~ "Outside_early",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek > 13 ~ "Outside_late")) %>% 
+  mutate(fishery = factor(fishery, levels = c("KTN", "PB-WR", "Inside", "Outside_early", "Outside_late")))
+
+asl_sport %>% 
+  count(biweek, fishery) %>% 
+  spread(fishery, n, fill = 0)
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize ASL data
+# Plot samples by Stat Week and Site
+# Using ggplot2 `geom_bar` (we know that there is 1 row per DNA sample)
+asl_sport %>% 
+  ggplot(aes(x = biweek, fill = fishery)) +
+  geom_bar() +
+  facet_wrap(~ site) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Biweek for Sport AY19")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in Harvest data
+# By Site and Biweek
+harvest_sport <- read_csv(file = "Harvest Data/preliminary_2018_sport_harvest_chinook.csv")
+str(harvest_sport, give.attr = FALSE)  # names for sites are different, data is wide
+problems(harvest_sport)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate harvest data
+# Make data tall (tidy), recode sites to ALL CAPS
+level_key <- list("Juneau" = "JUNEAU", 
+                  "Ketchikan" = "KETCHIKAN", 
+                  "Wrangell" = "WRANGELL", 
+                  "Petersburg" = "PETERSBURG", 
+                  "Sitka" = "SITKA", 
+                  "Craig" = "CRAIG_KLAWOCK", 
+                  "Gustavus" = "GUSTAVUS", 
+                  "Elfin Cove" = "ELFIN_COVE", 
+                  "Yakutat" = "YAKUTAT")
+
+harvest_sport <- harvest_sport %>% 
+  gather(site, harvest, -biweek) %>% 
+  mutate(site = recode_factor(site, !!!level_key, .ordered = TRUE))
+
+# Create a variable for Fishery
+harvest_sport <- harvest_sport %>% 
+  mutate(fishery = case_when(site == "KETCHIKAN" ~ "KTN",
+                             site %in% c("PETERSBURG", "WRANGELL") ~ "PB-WR",
+                             site == "JUNEAU" ~ "Inside",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek <= 13 ~ "Outside_early",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek > 13 ~ "Outside_late")) %>% 
+  mutate(fishery = factor(fishery, levels = c("KTN", "PB-WR", "Inside", "Outside_early", "Outside_late")))
+
+# Table of Harvest by site
+harvest_sport %>% 
+  select(-fishery) %>% 
+  spread(site,  harvest, fill = 0)
+
+# Table of Harvest by site
+harvest_sport %>% 
+  group_by(fishery, biweek) %>% 
+  summarise(harvest = sum(harvest)) %>% 
+  spread(fishery,  harvest, fill = 0)
+
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize Harvest Data
+# Plot samples by Stat Week (all Quadrants)
+# Using ggplot2 `geom_col` to plot harvest (identity)
+harvest_sport %>% 
+  ggplot(aes(x = biweek, y = harvest, fill = fishery)) +
+  geom_col() +
+  facet_wrap(~ site) +
+  ggtitle("Harvest by Biweek for Sport AY18")
+
+# Determine max harvest by site for heatmaps
+max_bw_harvest <- max(harvest_sport$harvest)
+
+# Heatmap of Harvest by Stat Week and District for Sport 1
+harvest_sport %>% 
+  ggplot(aes(x = biweek, y = site, fill = harvest, label = harvest)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "black", na.value = "white", limits = c(0, max_bw_harvest)) +
+  theme_classic() +
+  geom_text(color = "red") +
+  ggtitle("Sport - Harvest by Biweek and Site")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Join ASL and Harvest data by Site and Biweek
+# Roll up ASL to biweek and site level, join with harvest
+join_sport <- asl_sport %>% 
+  count(site, biweek) %>% 
+  full_join(harvest_sport, by = c("site", "biweek")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, harvest = 0))  # replace NA in samples and harvest with 0
+
+join_sport %>% 
+  filter(n > harvest)  # WTF, should be 0 rows...

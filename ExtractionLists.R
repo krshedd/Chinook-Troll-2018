@@ -5,7 +5,7 @@
 date()
 rm(list = ls(all.names = TRUE))
 
-setwd("V:/Analysis/1_SEAK/Chinook/Mixture/SEAK18")
+# setwd("V:/Analysis/1_SEAK/Chinook/Mixture/SEAK18")
 source("C:/Users/krshedd/R/Functions.GCL.R")
 library(tidyverse)
 library(lubridate)
@@ -1478,183 +1478,6 @@ summer_torun_extraction %>%
   count(SILLY, `TISSUE TYPE`)
 
 
-
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#### Spring ASL and Harvest Data ####
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# UPDATE
-# Planning to run each Quad as it's own mixture and stratify from there
-# Business rule is to take fish from within 2 SW on either side to fill in for missing
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## Read in ASL data
-spring_ASL <- read_csv(file = "ASL Data/2018 Spring Troll Chinook ASLDist Subdistrict.csv")
-str(spring_ASL, give.attr = FALSE)  # District = Quadrant
-
-#~~~~~~~~~~~~~~~~~~
-## Manipulate ASL data
-# Year as factor and create a variable for Fishery
-spring_ASL <- spring_ASL %>% 
-  mutate(Year_f = factor(Year)) %>% 
-  mutate(Fishery = case_when(Harvest == "Spring Troll Fishery" ~ "Spring",
-                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` <= 18 ~ "Late Winter",
-                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 41 ~ "Early Winter",
-                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 26 & `Stat Week` <= 31 ~ "Summer Ret 1",
-                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 32 & `Stat Week` <= 36 ~ "Summer Ret 2")) %>% 
-  mutate(Fishery = factor(Fishery, levels = c("Late Winter", "Spring", "Summer Ret 1", "Summer Ret 2", "Early Winter"))) %>% 
-  # mutate(Month = month(mdy(`Sample Date`), label = TRUE, abbr = FALSE))  # update! anything SW22 and less is May
-
-#~~~~~~~~~~~~~~~~~~
-## Visualize ASL data
-# Plot samples by Stat Week (all Quadrants)
-# Using ggplot2 `geom_bar` (we know that there is 1 row per DNA sample)
-spring_ASL %>% 
-  filter(Fishery == "Spring" & Year == "2018") %>%
-  filter(!is.na(`Dna Specimen No`)) %>% 
-  ggplot(aes(x = `Stat Week`, fill = Fishery)) +
-  geom_bar() +
-  facet_grid(Quadrant ~ Year) +
-  ylab("# DNA Samples") +
-  ggtitle("Samples by Stat Week for Spring AY18")
-
-
-# Plot samples by Stat Week and Quadrant
-# Using ggplot2 `geom_col` to plot harvest (identity)
-spring_ASL %>% 
-  filter(Fishery == "Spring" & Year == "2018") %>%
-  filter(!is.na(`Dna Specimen No`)) %>% 
-  ggplot(aes(x = `Stat Week`, fill = Fishery)) +
-  geom_bar() +
-  facet_grid(Quadrant ~ Month) +
-  ylab("# DNA Samples") +
-  ggtitle("Samples by Stat Week for Spring AY18")
-
-# Table of Samples by Fishery/Quadrant
-spring_ASL %>% 
-  filter(Fishery == "Spring" & Year == "2018") %>%
-  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
-  count(Year_f, Quadrant, Fishery, Month) %>% 
-  spread(Quadrant,  n)
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## Read in Harvest data
-harvest <- read_csv(file = "Harvest Data/CE005837.csv", skip = 22)
-str(harvest, give.attr = FALSE)  # Area Value = District, Time Value = Stat Week
-
-#~~~~~~~~~~~~~~~~~~
-## Manipulate harvest data
-# Year as factor, rename Stat Week, rename District
-harvest <- harvest %>% 
-  mutate(Year_f = factor(Year)) %>% 
-  rename("Stat Week" = `Time Value`, "Stat Area" = `Area Value`)
-
-# Create a variable for Fishery
-harvest <- harvest %>% 
-  mutate(Fishery = case_when(Harvest == "SP TROLL" ~ "Spring",
-                             Harvest == "TRAD" & `Stat Week` <= 18 ~ "Late Winter",
-                             Harvest == "TRAD" & `Stat Week` >= 41 ~ "Early Winter",
-                             Harvest == "TRAD" & `Stat Week` >= 26 & `Stat Week` <= 31 ~ "Summer Ret 1",
-                             Harvest == "TRAD" & `Stat Week` >= 32 & `Stat Week` <= 36 ~ "Summer Ret 2")) %>% 
-  mutate(Fishery = factor(Fishery, levels = c("Late Winter", "Spring", "Summer Ret 1", "Summer Ret 2", "Early Winter")))
-
-# Create a variable for District/SubDistrict
-harvest <- harvest %>% 
-  mutate(District = as.integer(str_sub(`Stat Area`, 1, 3)))
-
-# Create a variable for Quadrant
-harvest <- harvest %>% 
-  mutate(Quadrant = case_when(District %in% c(113, 114, 116, 154, 156, 157) | District >= 181 ~ 171,
-                              District %in% c(103, 104, 152) ~ 172,
-                              District %in% c(109, 110, 111, 112, 115) ~ 173,
-                              District %in% c(101, 102, 105, 106, 107, 108) ~ 174))
-
-#~~~~~~~~~~~~~~~~~~
-## Visualize Harvest Data
-# Plot samples by Stat Week (all Quadrants)
-# Using ggplot2 `geom_col` to plot harvest (identity)
-harvest %>% 
-  filter(Fishery == "Spring" & Year == "2018") %>%
-  group_by(Year_f, `Stat Week`, Fishery) %>% 
-  summarise(Harvest = sum(`N Catch`)) %>% 
-  ggplot(aes(x = `Stat Week`, y = Harvest, fill = Fishery)) +
-  geom_col() +
-  facet_grid(~ Year_f) +
-  ggtitle("Harvest by Stat Week for Spring AY18")
-
-# Plot samples by Stat Week and Quadrant
-# Using ggplot2 `geom_col` to plot harvest (identity)
-harvest %>% 
-  filter(Fishery == "Spring" & Year == "2018") %>%
-  group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
-  summarise(Harvest = sum(`N Catch`)) %>% 
-  ggplot(aes(x = `Stat Week`, y = Harvest, fill = Fishery)) +
-  geom_col() +
-  facet_grid(Quadrant ~ Year_f) +
-  ggtitle("Harvest by Stat Week and Quadrant for Spring AY18")
-
-# Table of Harvest by Fishery/Quadrant
-harvest %>% 
-  filter(Fishery == "Spring" & Year == "2018") %>%
-  group_by(Year_f, Fishery, Quadrant) %>% 
-  summarise(Harvest = sum(`N Catch`)) %>% 
-  spread(Quadrant, Harvest)
-
-# Determine max harvest by Fishery/District/Stat Week for heatmaps
-max_sw_harvest <- as.numeric(harvest %>% 
-                               filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
-                               summarise_at(vars(`N Catch`), max))
-
-# Heatmap of Harvest by Stat Week and District for Early Winter
-harvest %>% 
-  mutate(District = factor(x = District, levels = sort(unique(District)))) %>% 
-  filter(Fishery == "Early Winter" & Year == "2017") %>%
-  group_by(Year_f, `Stat Week`, Fishery, District) %>% 
-  summarise(Harvest = sum(`N Catch`)) %>% 
-  ggplot(aes(x = `Stat Week`, y = District, fill = Harvest, label = Harvest)) +
-  geom_tile() +
-  scale_fill_gradient(low = "white", high = "black", na.value = "white", limits = c(0, max_sw_harvest)) +
-  scale_x_continuous(breaks = 41:53) +
-  theme_classic() +
-  geom_text(color = "red") +
-  ggtitle("Early Winter - Harvest by Stat Week and District")
-
-# Heatmap of Harvest by Stat Week and District for Late Winter
-harvest %>% 
-  mutate(District = factor(x = District, levels = sort(unique(District)))) %>% 
-  filter(Fishery == "Late Winter" & Year == "2018") %>%
-  group_by(Year_f, `Stat Week`, Fishery, District) %>% 
-  summarise(Harvest = sum(`N Catch`)) %>% 
-  ggplot(aes(x = `Stat Week`, y = District, fill = Harvest, label = Harvest)) +
-  geom_tile() +
-  scale_fill_gradient(low = "white", high = "black", na.value = "white", limits = c(0, max_sw_harvest)) +
-  scale_x_continuous(breaks = 1:18) +
-  theme_classic() +
-  geom_text(color = "red") +
-  ggtitle("Late Winter - Harvest by Stat Week and District")
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## Join ASL and Harvest data by Quad by SW
-# Roll up harvest to Quad level
-harvest_yr_sw_fishery_quad.df <- harvest.df %>% 
-  filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
-  group_by(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
-  summarise(Harvest = sum(`N Catch`))
-
-# Roll up ASL to SW and Quad level, join with harvest
-harvest_ASL_join.df <- ASL.df %>% 
-  filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
-  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
-  count(Year_f, `Stat Week`, Fishery, Quadrant) %>% 
-  full_join(harvest_yr_sw_fishery_quad.df, by = c("Year_f", "Stat Week", "Fishery", "Quadrant")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
-  replace_na(list(n = 0, Harvest = 0))  # replace NA in samples and harvest with 0
-
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #### Sport ASL and Harvest Data ####
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2307,4 +2130,1262 @@ sport_torun_extraction <- sport_torun_asl_mod %>%
 write_csv(sport_torun_extraction, path = "Extraction Lists/Sport_Origins_Extraction.csv")
 
 sport_torun_extraction %>% 
+  count(SILLY, `TISSUE TYPE`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Spring ASL and Harvest Data ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Thu Dec 13 13:02:34 2018
+# Planning to run each Stat Area/Month (period) as it's own mixture and stratify from there
+# Business rule is to take fish from within 1 SW on either side to fill in for missing
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in ASL data
+spring_ASL <- read_csv(file = "../ASL Data/2018 Spring Troll Chinook ASLDist Subdistrict.csv")
+str(spring_ASL, give.attr = FALSE)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+# Year as factor and create a variable for Fishery
+spring_ASL <- spring_ASL %>% 
+  mutate(Year_f = factor(Year)) %>% 
+  mutate(Fishery = case_when(Harvest == "Spring Troll Fishery" ~ "Spring",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` <= 18 ~ "Late Winter",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 41 ~ "Early Winter",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 26 & `Stat Week` <= 31 ~ "Summer Ret 1",
+                             Harvest == "Traditional State Managed Fisheries" & `Stat Week` >= 32 & `Stat Week` <= 36 ~ "Summer Ret 2")) %>% 
+  mutate(Fishery = factor(Fishery, levels = c("Late Winter", "Spring", "Summer Ret 1", "Summer Ret 2", "Early Winter"))) %>% 
+  mutate(Month = case_when(`Stat Week` <= 22 ~ "May",
+                           `Stat Week` >= 23 ~ "June")) %>%  # update! anything SW22 and less is May
+  mutate(Month = factor(Month, levels = c("May", "June"))) %>% 
+  unite("Stat Area", c(District, `Sub/District`), sep = '')
+  
+  #~~~~~~~~~~~~~~~~~~
+  ## Visualize ASL data
+  # Plot samples by Stat Week and Stat Area
+  # Using ggplot2 `geom_bar` (we know that there is 1 row per DNA sample)
+spring_ASL %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>% 
+  ggplot(aes(x = `Stat Week`, fill = Fishery)) +
+  geom_bar() +
+  scale_x_continuous(breaks = 17:27) +
+  facet_grid(`Stat Area` ~ Month) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Stat Week and Stat Area for Spring AY18")
+
+
+# Plot samples by Stat Week and Quadrant
+# Using ggplot2 `geom_col` to plot harvest (identity)
+spring_ASL %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>% 
+  ggplot(aes(x = `Stat Week`, fill = Fishery)) +
+  geom_bar() +
+  scale_x_continuous(breaks = 17:27) +
+  facet_grid(Quadrant ~ Month) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Stat Week and Quadrant for Spring AY18")
+
+# Table of Samples by Fishery/Quadrant
+spring_ASL %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Year_f, Quadrant, Fishery, Month) %>% 
+  spread(Quadrant,  n)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in Harvest data
+harvest_spring <- read_csv("../Harvest Data/ft - Detailed Fish Tickets_spring.csv")
+str(harvest_spring, give.attr = FALSE)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+# Year as factor and create a variable for Fishery
+harvest_spring <- harvest_spring %>% 
+  mutate(Quadrant = case_when(District %in% c(113, 114, 116, 154, 156, 157) | District >= 181 ~ 171,
+                              District %in% c(103, 104, 152) ~ 172,
+                              District %in% c(109, 110, 111, 112, 115) ~ 173,
+                              District %in% c(101, 102, 105, 106, 107, 108) ~ 174)) %>% 
+  mutate(Month = case_when(`Stat Week` <= 22 ~ "May",
+                           `Stat Week` >= 23 ~ "June")) %>%  # update! anything SW22 and less is May
+  mutate(Month = factor(Month, levels = c("May", "June")))
+
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize Harvest Data
+# Plot samples by Stat Week and Stat Area
+# Using ggplot2 `geom_col` to plot harvest (identity)
+harvest_spring %>% 
+  filter(`Harvest Code` == 13 & Year == "2018") %>%
+  group_by(`Stat Week`, `Harvest Code`, `Stat Area`, Month) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = Harvest, fill = `Harvest Code`)) +
+  geom_col() +
+  scale_x_continuous(breaks = 17:27) +
+  facet_grid(`Stat Area` ~ Month) +
+  ggtitle("Harvest by Stat Week and Stat Area for Spring AY18")
+
+# Plot samples by Stat Week and Quadrant
+# Using ggplot2 `geom_col` to plot harvest (identity)
+harvest_spring %>% 
+  filter(`Harvest Code` == 13 & Year == "2018") %>%
+  group_by(`Stat Week`, `Harvest Code`, Quadrant, Month) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = Harvest, fill = `Harvest Code`)) +
+  geom_col() +
+  scale_x_continuous(breaks = 17:27) +
+  facet_grid(Quadrant ~ Month) +
+  ggtitle("Harvest by Stat Week and Quadrant for Spring AY18")
+
+# Table of Harvest by Fishery/Quadrant
+harvest_spring %>% 
+  filter(`Harvest Code` == 13 & Year == "2018") %>%
+  group_by(`Harvest Code`, Quadrant, Month) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`)) %>% 
+  spread(Quadrant, Harvest)
+
+# Determine max harvest by Fishery/District/Stat Week for heatmaps
+# max_sw_harvest <- harvest_spring %>% 
+#   filter(Fishery == "Early Winter" & Year == "2017" | Fishery == "Late Winter" & Year == "2018") %>%
+#   summarise_at(vars(`N Catch`), max))
+
+# Heatmap of Harvest by Stat Week and District for Early Winter
+harvest_spring %>% 
+  mutate(`Stat Area` = factor(x = `Stat Area`, levels = sort(unique(`Stat Area`)))) %>% 
+  filter(`Harvest Code` == 13 & Year == "2018") %>%
+  group_by(`Stat Week`, `Stat Area`) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = `Stat Area`, fill = Harvest, label = Harvest)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "black", na.value = "white") +
+  scale_x_continuous(breaks = 17:27) +
+  theme_classic() +
+  geom_text(color = "red") +
+  ggtitle("Spring - Harvest by Stat Week and Stat Area")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Join ASL and Harvest data by Quad by SW
+# Roll up harvest to Quad level
+harvest_sw_statarea <- harvest_spring %>% 
+  filter(`Harvest Code` == 13 & Year == "2018") %>%
+  mutate(`Stat Area` = as.character(`Stat Area`)) %>% 
+  group_by(`Stat Week`, `Harvest Code`, `Stat Area`, Quadrant, Month) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`)) 
+
+
+# Roll up ASL to SW and Quad level, join with harvest
+join_spring <- spring_ASL %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Fishery, `Stat Week`, `Stat Area`) %>% 
+  full_join(harvest_sw_statarea, by = c("Stat Week", "Stat Area")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0)) %>%  # replace NA in samples and harvest with 0
+  select(`Stat Area`, Month, `Stat Week`, n, Harvest)
+  
+join_spring %>% 
+  filter(n > Harvest)  # should be 0 rows...
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Spring Selection ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Sample size numbers are "weird" this year since we decided to look at Stat Area by Month
+# There was a long discussion with the troll AMB's, Ed Jones (SF), Dani (treaty) and Randy (biometrician)
+# The agreed upon strata are listed in an e-mail thread
+# RE_ GSI 2018 Sample Selection_ Spring Troll + THA + CR
+
+# Plot samples and harvest together as proportions
+join_spring %>% 
+  select(`Stat Area`, `Stat Week`, n , Harvest) %>% 
+  group_by(`Stat Area`) %>% 
+  mutate(n = n / sum(n), harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -`Stat Week`, -`Stat Area`, - Harvest) %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = variable)) +
+  geom_col() +
+  scale_x_continuous(breaks = 17:27) +
+  facet_grid(`Stat Area` ~ variable, scales = "fixed") +
+  ggtitle("Proportion of Samples and Harvest\nby Stat Week and Stat Area for Spring Troll AY18")
+
+# Thus the plan for extraction is to pick ~200 for 101-45 for May
+# With the important caveat of subsampling in proportion to harvest by SW for each quadrant
+# Business rule is to take fish from within 1 SW on either side to fill in for missing
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### 101-45 
+#~~~~~~~~~~~~~~~~~~
+## May
+# Subsample 200 fish
+n_sub <- 200
+
+# What does proportional sampling look like?
+(extraction_10145_may <- join_spring %>% 
+    filter(`Stat Area` == "10145" & Month == "May") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10145_may <- extraction_10145_may %>% 
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10145_may$n) == n_sub
+
+# Randomly pick fish
+may_10145_torun <- spring_ASL %>% 
+  filter(`Stat Area` == "10145") %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_10145_may, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+may_10145_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## June
+# Subsample 200 fish
+n_sub <- 200
+
+# What does proportional sampling look like?
+(extraction_10145_june <- join_spring %>% 
+    filter(`Stat Area` == "10145" & Month == "June") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10145_june <- extraction_10145_june %>% 
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10145_june$n) == n_sub
+
+# Randomly pick fish
+june_10145_torun <- spring_ASL %>% 
+  mutate(WGC_4digit = str_sub(`Dna Specimen No`, 1, 4)) %>%  # get last 4 digits of WGC
+  filter(`Stat Area` == "10145", WGC_4digit != 7486) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_10145_june, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+june_10145_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### 103-50 
+#~~~~~~~~~~~~~~~~~~
+## May
+# Subsample 200 fish
+n_sub <- 200
+
+# What does proportional sampling look like?
+(extraction_10350_may <- join_spring %>% 
+    filter(`Stat Area` == "10350" & Month == "May") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract, except sw20, push in to 19 and 21
+(extraction_10350_may <- extraction_10350_may %>% 
+    mutate(n_extract = case_when(`Stat Week` == 19 ~ 28,
+                                 `Stat Week` == 21 ~ 23,
+                                 TRUE ~ n_extract)) %>%
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10350_may$n) == n_sub
+
+# Randomly pick fish
+may_10350_torun <- spring_ASL %>% 
+  filter(`Stat Area` == "10350") %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_10350_may, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+may_10350_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## June
+# Subsample 200 fish
+n_sub <- 200
+
+# What does proportional sampling look like?
+(extraction_10350_june <- join_spring %>% 
+    filter(`Stat Area` == "10350" & Month == "June") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10350_june <- extraction_10350_june %>% 
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10350_june$n) == n_sub
+
+# Randomly pick fish
+june_10350_torun <- spring_ASL %>% 
+  filter(`Stat Area` == "10350") %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_10350_june, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+june_10350_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### 113-01 
+#~~~~~~~~~~~~~~~~~~
+## June
+# Subsample 200 fish
+n_sub <- 200
+
+# What does proportional sampling look like?
+(extraction_11301_june <- join_spring %>% 
+    filter(`Stat Area` == "11301" & Month == "June") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract, except sw24, push in to 23 and 25
+(extraction_11301_june <- extraction_11301_june %>% 
+    mutate(n_extract = case_when(`Stat Week` == 23 ~ 59,
+                                 `Stat Week` == 25 ~ 52,
+                                 TRUE ~ n_extract)) %>%
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_11301_june$n) == n_sub
+
+# Randomly pick fish
+june_11301_torun <- spring_ASL %>% 
+  filter(`Stat Area` == "11301") %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_11301_june, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+june_11301_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### 113-30 
+#~~~~~~~~~~~~~~~~~~
+## May + June
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_11330_may_june <- join_spring %>% 
+    filter(`Stat Area` == "11330") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract, pull SW 19 to add to 100
+(extraction_11330_may_june <- extraction_11330_may_june %>% 
+    mutate(n_extract = case_when(`Stat Week` == 19 ~ 16,
+                                 TRUE ~ n_extract)) %>%
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_11330_may_june$n) == n_sub
+
+# Randomly pick fish
+may_june_11330_torun <- spring_ASL %>% 
+  filter(`Stat Area` == "11330") %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_11330_may_june, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+may_june_11330_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### 113-41 
+#~~~~~~~~~~~~~~~~~~
+## May
+# Subsample 200 fish
+n_sub <- 200
+
+# What does proportional sampling look like?
+(extraction_11341_may <- join_spring %>% 
+    filter(`Stat Area` == "11341" & Month == "May") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_11341_may <- extraction_11341_may %>% 
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_11341_may$n) == n_sub
+
+# Randomly pick fish
+may_11341_torun <- spring_ASL %>% 
+  filter(`Stat Area` == "11341") %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_11341_may, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+may_11341_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~
+## June
+# Subsample 200 fish
+n_sub <- 199.5
+
+# What does proportional sampling look like?
+(extraction_11341_june <- join_spring %>% 
+    filter(`Stat Area` == "11341" & Month == "June") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_11341_june <- extraction_11341_june %>% 
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_11341_june$n) == round(n_sub)
+
+# Randomly pick fish
+june_11341_torun <- spring_ASL %>% 
+  mutate(WGC_4digit = str_sub(`Dna Specimen No`, 1, 4)) %>%  # get last 4 digits of WGC
+  filter(`Stat Area` == "11341", WGC_4digit != 6334) %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_11341_june, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+june_11341_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### 113-62 
+#~~~~~~~~~~~~~~~~~~
+## June
+# Subsample 200 fish
+n_sub <- 200.55
+
+# What does proportional sampling look like?
+(extraction_11362_june <- join_spring %>% 
+    filter(`Stat Area` == "11362" & Month == "June") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract, except sw23, push in to 24
+(extraction_11362_june <- extraction_11362_june %>% 
+    mutate(n_extract = case_when(`Stat Week` == 24 ~ 98,
+                                 TRUE ~ n_extract)) %>%
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_11362_june$n) == round(n_sub)-1
+
+# Randomly pick fish
+june_11362_torun <- spring_ASL %>% 
+  filter(`Stat Area` == "11362") %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_11362_june, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+june_11362_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### 183-10 
+#~~~~~~~~~~~~~~~~~~
+## May + June
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_18310_may_june <- join_spring %>% 
+    filter(`Stat Area` == "18310") %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 200 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract, no samples from SW 26, so push samples to 24 and 25
+(extraction_18310_may_june <- extraction_18310_may_june %>% 
+    mutate(n_extract = case_when(`Stat Week` == 24 ~ 24,
+                                 `Stat Week` == 25 ~ 9,
+                                 TRUE ~ n_extract)) %>%
+    select(`Stat Area`, `Stat Week`, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_18310_may_june$n) == n_sub
+
+# Randomly pick fish
+may_june_18310_torun <- spring_ASL %>% 
+  filter(`Stat Area` == "18310") %>% 
+  nest(-`Stat Week`) %>% 
+  right_join(extraction_18310_may_june, by = "Stat Week") %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+may_june_18310_torun %>% 
+  count(`Stat Week`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Create a single Spring Extraction data.frame
+rm(spring_torun_asl)
+spring_torun_asl <- bind_rows(lapply(objects(pattern = "torun"), get))
+
+# plates
+nrow(spring_torun_asl) / 95
+
+#
+spring_torun_asl %>% 
+  count(`Stat Area`, Month) %>% 
+  spread(Month, nn, fill = 0)
+
+save_objects("spring_torun_asl", path = "../Objects")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Write Spring Extraction List ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Format into the Extraction List Template
+load_objects("Objects")
+
+# Confirm that all `Dna Specimen No` are 6 characters before splitting
+table(nchar(spring_torun_asl$`Dna Specimen No`))
+
+# Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples
+# So the `Dna Specimen No` isn't enough for me to figure out the whole 10 digit WGC number
+# First check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits)
+
+spring_torun_asl %>% 
+  mutate(WGC_4digit = str_sub(`Dna Specimen No`, 1, 4)) %>%  # get last 4 digits of WGC
+  group_by(WGC_4digit) %>%  # group by those 4 digits
+  summarise(count = n_distinct(`Sample Date`)) %>%  # count unique sample dates
+  summarise(count = max(count)) # what is the maximum number of sample dates per unique 4 digit WGC, should be 1
+# good to go
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Pull tissue collection info from OceanAK and join, need full 10 digit WGC number and Sample number
+loki_tissue_spring <- read_csv(file = "../Associated Data/Spring Troll/GEN_SAMPLED_FISH_TISSUE_KTROL18SP.csv")
+
+# Subset for variables of interest
+loki_tissue_spring <- loki_tissue_spring %>% 
+  filter(is.na(IS_MISSING_PAIRED_DATA_EXISTS)) %>%  # make sure we aren't issing the tissue
+  select(`Silly Code`, FK_FISH_ID, DNA_TRAY_CODE, DNA_TRAY_WELL_CODE, PK_TISSUE_TYPE) %>% 
+  mutate(WGC_4digit = str_sub(DNA_TRAY_CODE, 7, 10)) %>% 
+  mutate(WGC_2digit_pos = str_pad(string = DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  unite(dna_specimen_no, c(WGC_4digit, WGC_2digit_pos), sep = '', remove = FALSE) %>% 
+  mutate(dna_specimen_no = as.integer(dna_specimen_no))
+
+#~~~~~~~~~~~~~~~~~~
+## Are all my extraction fish in the LOKI tissue table?
+table(spring_torun_asl$`Dna Specimen No` %in% loki_tissue_spring$dna_specimen_no)  # 25 FALSE, now 10 after removing missing WGCs
+
+# Are all my extraction WGCs in the LOKI tissue table?
+asl_WGC_4digit <- spring_torun_asl %>% 
+  mutate(WGC_4digit = str_sub(`Dna Specimen No`, 1, 4)) %>% 
+  pull(WGC_4digit)
+
+table(asl_WGC_4digit %in% loki_tissue_spring$WGC_4digit)  # originally 2 WGCs that were missing, now 0
+
+# No, which ones are missing
+missing_WGC <- sort(setdiff(asl_WGC_4digit, loki_tissue_spring$WGC_4digit))
+
+# What Stat Area, Stat Week were missing WGCs?
+spring_torun_asl %>% 
+  mutate(WGC_4digit = str_sub(`Dna Specimen No`, 1, 4)) %>% 
+  filter(WGC_4digit %in% missing_WGC) %>% 
+  select(Fishery, `Stat Area`, `Stat Week`, `Dna Specimen No`) %>% 
+  count(`Stat Area`, `Stat Week`)
+
+# Can we just grab fish from another WGC from those Stat Area + Stat Weeks?
+spring_torun_asl %>% 
+  filter(`Stat Area` == "10145" & `Stat Week` == 25 | `Stat Area` == "11341" & `Stat Week` == 24) %>% 
+  count(`Stat Area`, `Stat Week`)  # yes, replaced 2 missing cards
+
+
+
+# No, which ones are missing
+missing_fish <- sort(setdiff(spring_torun_asl$`Dna Specimen No`, loki_tissue_spring$dna_specimen_no))
+
+spring_torun_asl %>% 
+  filter(`Dna Specimen No` %in% missing_fish) %>% 
+  select(Fishery, `Stat Area`, `Stat Week`, `Dna Specimen No`) %>% 
+  count(`Stat Area`, `Stat Week`)
+
+# What is the max sample n on each of these cards?
+loki_tissue_spring %>% 
+  filter(WGC_4digit %in% as.character(str_sub(missing_fish, 1, 4))) %>% 
+  group_by(WGC_4digit) %>% 
+  summarise(max = max(WGC_2digit_pos))
+
+missing_fish
+
+# Attempt to pick the "next fish" or "previous fish"
+new_fish <- c(483902, 628313, 628606, 631840, 632509, 632526, 632533, 632534, 633704, 870318)
+missing_fish - new_fish # great, no typos
+
+# Make sure these "new fish" are not already in the extraction list
+intersect(new_fish, spring_torun_asl$`Dna Specimen No`) # if not zero, modify `new_fish`
+
+# Make sure these "new fish" exist in LOKI
+setdiff(new_fish, loki_tissue_spring$dna_specimen_no) # if not zero, modify `new_fish`
+
+# New fish asl
+asl_spring_new_fish <- spring_ASL %>% 
+  filter(`Dna Specimen No` %in% new_fish)
+
+#~~~~~~~~~~~~~~~~~~
+## Update spring_torun_asl
+spring_torun_asl_mod <- spring_torun_asl %>% 
+  filter(!`Dna Specimen No` %in% missing_fish) %>% 
+  bind_rows(asl_spring_new_fish)
+
+# Make sure the "missing column is fine
+table(spring_torun_asl_mod$n, useNA = "always")
+
+# Verify that we have the correct numbers of fish per fishery/quadrant
+spring_torun_asl_mod %>% 
+  count(`Stat Area`, Month) %>% 
+  spread(Month, nn, fill = 0)
+
+# Verify that we have the correct numbers of fish per statweek/quadrant
+spring_torun_asl_mod %>% 
+  count(`Stat Week`, `Stat Area`) %>% 
+  spread(`Stat Week`, nn, fill = 0)
+
+save_objects("spring_torun_asl_mod", path = "../Objects")
+
+
+#~~~~~~~~~~~~~~~~~~
+## Plot proportion of samples and harvest to verify
+spring_torun_asl_mod %>% 
+  filter(Fishery == "Spring" & Year == "2018") %>%
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(Fishery, `Stat Week`, `Stat Area`) %>% 
+  rename(n = nn) %>% 
+  full_join(harvest_sw_statarea, by = c("Stat Week", "Stat Area")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0)) %>%  # replace NA in samples and harvest with 0
+  select(`Stat Area`, `Stat Week`, n , Harvest, Month) %>% 
+  group_by(`Stat Area`, Month) %>% 
+  mutate(n = n / sum(n), harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -`Stat Week`, -`Stat Area`, -Harvest, -Month) %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = Month)) +
+  geom_col() +
+  scale_x_continuous(breaks = 17:27) +
+  facet_grid(`Stat Area` ~ variable, scales = "fixed") +
+  ggtitle("Proportion of Samples and Harvest\nby Stat Week and Stat Area for Spring Troll AY18")
+
+# Overall, pretty good
+
+#~~~~~~~~~~~~~~~~~~
+## Join LOKI Tissue Table with ASL and format for Extraction List Template
+spring_torun_extraction <- spring_torun_asl_mod %>% 
+  left_join(loki_tissue_spring, by = c(`Dna Specimen No` = "dna_specimen_no")) %>% 
+  mutate(`WELL CODE` = str_pad(DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  mutate(`TISSUE TYPE` = str_replace(PK_TISSUE_TYPE, pattern = " Process", replacement = "")) %>% 
+  mutate(`TISSUE TYPE` = str_replace(`TISSUE TYPE`, pattern = " Clip", replacement = "")) %>% 
+  rename(SILLY = `Silly Code`, `SAMPLE #` = FK_FISH_ID, `WGC BARCODE` = `DNA_TRAY_CODE`) %>% 
+  select(SILLY, `SAMPLE #`, `WGC BARCODE`, `WELL CODE`, `TISSUE TYPE`) %>% 
+  arrange(SILLY, `WGC BARCODE`, `WELL CODE`)
+
+write_csv(spring_torun_extraction, path = "../Extraction Lists/Spring_Extraction.csv")
+
+spring_torun_extraction %>% 
+  count(SILLY, `TISSUE TYPE`)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Terminal ASL and Harvest Data ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Thu Dec 13 16:04:59 2018
+# Planning to run each Stat Area/Month (period) as it's own mixture and stratify from there
+# Business rule is to take fish from within 1 SW on either side to fill in for missing
+# We decided as a group to just focus in on Neet's Bay (101-95) and Anita Bay (107-35)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in ASL data
+THA_ASL <- read_csv(file = "../ASL Data/20181213_terminal_Harvest - Detailed ASL Samples.csv")
+str(THA_ASL, give.attr = FALSE)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+# Year as factor and create a variable for Fishery
+THA_ASL <- THA_ASL %>% 
+  mutate(Year_f = factor(Year)) %>% 
+  unite("Stat Area", c(District, `Sub-District`), sep = '') %>% 
+  filter(`Stat Area` %in% c("10195", "10735")) %>% 
+  mutate(gear = case_when(Gear == "Drift Gillnet" ~ "Gillnet",
+                          Gear == "Hand Troll" ~ "Troll",
+                          Gear == "Purse Seine" ~ "Seine"))
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize ASL data
+# Plot samples by Stat Week and Stat Area
+# Using ggplot2 `geom_bar` (we know that there is 1 row per DNA sample)
+THA_ASL %>% 
+  filter(!is.na(`Dna Specimen No`)) %>% 
+  ggplot(aes(x = `Stat Week`, fill = gear)) +
+  geom_bar() +
+  facet_grid(`Stat Area` ~ gear) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Stat Week and Stat Area for THA 2018")
+
+
+# Table of Samples by Fishery/Quadrant
+THA_ASL %>% 
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(`Stat Area`, `Stat Week`, gear) %>% 
+  spread(`Stat Week`,  n, fill = 0)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in Harvest data
+harvest_THA <- read_csv("../Harvest Data/ft - Detailed Fish Tickets_terminal.csv")
+str(harvest_THA, give.attr = FALSE)
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate Harvest data
+# Consolidate Gear
+harvest_THA <- harvest_THA %>% 
+  mutate(`Stat Area` = as.character(`Stat Area`)) %>% 
+  filter(`Stat Area` %in% c("10195", "10735")) %>% 
+  mutate(gear = case_when(`Gear Name` == "Drift gillnet" ~ "Gillnet",
+                          `Gear Name` == "Hand Troll" ~ "Troll",
+                          `Gear Name` == "Power gurdy troll" ~ "Troll",
+                          `Gear Name` == "Purse seine" ~ "Seine")) %>% 
+  filter(!is.na(gear))
+
+#~~~~~~~~~~~~~~~~~~
+## Visualize Harvest Data
+# Plot samples by Stat Week and Stat Area
+# Using ggplot2 `geom_col` to plot harvest (identity)
+harvest_THA %>% 
+  group_by(`Stat Week`, `Stat Area`, gear) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`)) %>% 
+  ggplot(aes(x = `Stat Week`, y = Harvest, fill = gear)) +
+  geom_col() +
+  facet_grid(`Stat Area` ~ gear) +
+  ggtitle("Harvest by Stat Week and Stat Area for THA 2018")
+
+# Table of Harvest by Fishery/Quadrant
+harvest_THA %>% 
+  group_by(`Stat Week`, `Stat Area`, gear) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`)) %>% 
+  spread(`Stat Week`, Harvest, fill = 0)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Join ASL and Harvest data by Quad by SW
+# Roll up harvest to Quad level
+harvest_sw_statarea <- harvest_THA %>% 
+  group_by(`Stat Week`, `Stat Area`, gear) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`)) 
+
+
+# Roll up ASL to SW and Quad level, join with harvest
+join_THA <- THA_ASL %>% 
+  filter(!is.na(`Dna Specimen No`)) %>%  # filter for known DNA samples
+  count(gear, `Stat Week`, `Stat Area`) %>% 
+  full_join(harvest_sw_statarea, by = c("Stat Week", "Stat Area", "gear")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, Harvest = 0)) %>%  # replace NA in samples and harvest with 0
+  select(gear, `Stat Area`, `Stat Week`, n, Harvest)
+
+join_THA %>% 
+  filter(n > Harvest)  # should be 0 rows...
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### THA Selection ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Sample size numbers are "weird" this year since we decided to look at THA harvest in Neets (101-95) and Anita (107-35)
+# There was a long discussion with the troll AMB's, Ed Jones (SF), Dani (treaty) and Randy (biometrician)
+# The agreed upon strata are listed in an e-mail thread, with some SW's alone and other combined
+# The goal is to figure out timing of SEAK wild-origin Chinook
+# RE_ GSI 2018 Sample Selection_ Spring Troll + THA + CR
+
+# Plot samples and harvest together as proportions
+join_THA %>% 
+  group_by(`Stat Area`) %>% 
+  mutate(n = n / sum(n), harvest = Harvest / sum(Harvest)) %>% 
+  ungroup() %>% 
+  gather(variable, proportion, -`Stat Week`, -`Stat Area`, - Harvest, -gear) %>% 
+  ggplot(aes(x = `Stat Week`, y = proportion, fill = gear)) +
+  geom_col() +
+  facet_grid(`Stat Area` ~ variable, scales = "fixed") +
+  ggtitle("Proportion of Samples and Harvest\nby Stat Week and Stat Area for THA 2018")
+
+# Thus the plan for extraction is to pick ~200 for 101-45 for May
+# With the important caveat of subsampling in proportion to harvest by SW for each quadrant
+# Business rule is to take fish from within 1 SW on either side to fill in for missing
+# Business rule is to take fish from within the SAME SW from a different gear group to fill in for missing
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### Neets Bay 101-95
+#~~~~~~~~~~~~~~~~~~
+## SW 18-23
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_10195_sw18_23 <- join_THA %>% 
+    filter(`Stat Area` == "10195" & `Stat Week` %in% 18:23) %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 100 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10195_sw18_23 <- extraction_10195_sw18_23 %>% 
+    mutate(n_extract = case_when(`Stat Week` == 22 & gear == "Troll" ~ 28,
+                                 `Stat Week` == 23 & gear == "Gillnet" ~ 62,
+                                 TRUE ~ n_extract)) %>%
+    select(`Stat Area`, `Stat Week`, gear, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10195_sw18_23$n) == n_sub
+
+# Randomly pick fish
+neets_10195_sw18_23_torun <- THA_ASL %>% 
+  filter(`Stat Area` == "10195") %>% 
+  nest(-`Stat Week`, -gear) %>% 
+  right_join(extraction_10195_sw18_23, by = c("Stat Week", "gear")) %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+neets_10195_sw18_23_torun %>% 
+  count(`Stat Week`, gear)
+
+
+#~~~~~~~~~~~~~~~~~~
+## SW 24
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_10195_sw24 <- join_THA %>% 
+    filter(`Stat Area` == "10195" & `Stat Week` %in% 24) %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 100 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10195_sw24 <- extraction_10195_sw24 %>% 
+    select(`Stat Area`, `Stat Week`, gear, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10195_sw24$n) == n_sub
+
+# Randomly pick fish
+neets_10195_sw24_torun <- THA_ASL %>% 
+  filter(`Stat Area` == "10195") %>% 
+  nest(-`Stat Week`, -gear) %>% 
+  right_join(extraction_10195_sw24, by = c("Stat Week", "gear")) %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+neets_10195_sw24_torun %>% 
+  count(`Stat Week`, gear)
+
+
+#~~~~~~~~~~~~~~~~~~
+## SW 25-27
+# Subsample 100 fish
+n_sub <- 100.4
+
+# What does proportional sampling look like?
+(extraction_10195_sw25_27 <- join_THA %>% 
+    filter(`Stat Area` == "10195" & `Stat Week` %in% 25:27) %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 100 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10195_sw25_27 <- extraction_10195_sw25_27 %>% 
+    select(`Stat Area`, `Stat Week`, gear, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10195_sw25_27$n) == round(n_sub)
+
+# Randomly pick fish
+neets_10195_sw25_27_torun <- THA_ASL %>% 
+  filter(`Stat Area` == "10195") %>% 
+  nest(-`Stat Week`, -gear) %>% 
+  right_join(extraction_10195_sw25_27, by = c("Stat Week", "gear")) %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+neets_10195_sw25_27_torun %>% 
+  count(`Stat Week`, gear)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### Anita Bay 107-35
+#~~~~~~~~~~~~~~~~~~
+## SW 20-21
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_10735_sw20_21 <- join_THA %>% 
+    filter(`Stat Area` == "10735" & `Stat Week` %in% 20:21) %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 100 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10735_sw20_21 <- extraction_10735_sw20_21 %>% 
+    select(`Stat Area`, `Stat Week`, gear, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10735_sw20_21$n) == n_sub
+
+# Randomly pick fish
+anita_10735_sw20_21_torun <- THA_ASL %>% 
+  filter(`Stat Area` == "10735") %>% 
+  nest(-`Stat Week`, -gear) %>% 
+  right_join(extraction_10735_sw20_21, by = c("Stat Week", "gear")) %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+anita_10735_sw20_21_torun %>% 
+  count(`Stat Week`, gear)
+
+
+#~~~~~~~~~~~~~~~~~~
+## SW 22
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_10735_sw22 <- join_THA %>% 
+    filter(`Stat Area` == "10735" & `Stat Week` %in% 22) %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 100 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10735_sw22 <- extraction_10735_sw22 %>% 
+    select(`Stat Area`, `Stat Week`, gear, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10735_sw22$n) == n_sub
+
+# Randomly pick fish
+anita_10735_sw22_torun <- THA_ASL %>% 
+  filter(`Stat Area` == "10735") %>% 
+  nest(-`Stat Week`, -gear) %>% 
+  right_join(extraction_10735_sw22, by = c("Stat Week", "gear")) %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+anita_10735_sw22_torun %>% 
+  count(`Stat Week`, gear)
+
+
+#~~~~~~~~~~~~~~~~~~
+## SW 23
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_10735_sw23 <- join_THA %>% 
+    filter(`Stat Area` == "10735" & `Stat Week` %in% 23) %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 100 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10735_sw23 <- extraction_10735_sw23 %>% 
+    select(`Stat Area`, `Stat Week`, gear, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10735_sw23$n) == n_sub
+
+# Randomly pick fish
+anita_10735_sw23_torun <- THA_ASL %>% 
+  filter(`Stat Area` == "10735") %>% 
+  nest(-`Stat Week`, -gear) %>% 
+  right_join(extraction_10735_sw23, by = c("Stat Week", "gear")) %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+anita_10735_sw23_torun %>% 
+  count(`Stat Week`, gear)
+
+
+#~~~~~~~~~~~~~~~~~~
+## SW 24
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_10735_sw24 <- join_THA %>% 
+    filter(`Stat Area` == "10735" & `Stat Week` %in% 24) %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 100 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10735_sw24 <- extraction_10735_sw24 %>% 
+    mutate(n_extract = case_when(`Stat Week` == 24 & gear == "Seine" ~ 16,
+                                 `Stat Week` == 24 & gear == "Troll" ~ 24,
+                                 TRUE ~ n_extract)) %>%
+    select(`Stat Area`, `Stat Week`, gear, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10735_sw24$n) == n_sub
+
+# Randomly pick fish
+anita_10735_sw24_torun <- THA_ASL %>% 
+  filter(`Stat Area` == "10735") %>% 
+  nest(-`Stat Week`, -gear) %>% 
+  right_join(extraction_10735_sw24, by = c("Stat Week", "gear")) %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+anita_10735_sw24_torun %>% 
+  count(`Stat Week`, gear)
+
+
+#~~~~~~~~~~~~~~~~~~
+## SW 25-30
+# Subsample 100 fish
+n_sub <- 100
+
+# What does proportional sampling look like?
+(extraction_10735_sw25_30 <- join_THA %>% 
+    filter(`Stat Area` == "10735" & `Stat Week` %in% 25:30) %>% 
+    arrange(`Stat Week`) %>% 
+    mutate(p_harvest = round(Harvest / sum(Harvest) * n_sub)) %>%  # if we want 100 samples proportional to harvest by SW
+    mutate(n_sufficeint = n >= p_harvest) %>% 
+    mutate(n_remainings = n - p_harvest) %>% 
+    mutate(n_extract = pmin(n, p_harvest)))
+
+# How many fish per week?
+# Plenty of samples, so just go with n_extract
+(extraction_10735_sw25_30 <- extraction_10735_sw25_30 %>% 
+    mutate(n_extract = case_when(`Stat Week` == 26 & gear == "Seine" ~ 24,
+                                 `Stat Week` == 27 & gear == "Seine" ~ 23,
+                                 `Stat Week` == 28 & gear == "Seine" ~ 7,
+                                 `Stat Week` == 29 & gear == "Seine" ~ 5,
+                                 TRUE ~ n_extract)) %>%
+    select(`Stat Area`, `Stat Week`, gear, n_extract) %>% 
+    rename(n = n_extract) %>% 
+    filter(n > 0))  # can only keep rows > 0, otherwise nest doesn't work for picking fish
+
+sum(extraction_10735_sw25_30$n) == n_sub
+
+# Randomly pick fish
+anita_10735_sw25_30_torun <- THA_ASL %>% 
+  filter(`Stat Area` == "10735") %>% 
+  nest(-`Stat Week`, -gear) %>% 
+  right_join(extraction_10735_sw25_30, by = c("Stat Week", "gear")) %>% 
+  mutate(sample = map2(data, n, sample_n)) %>% 
+  unnest(sample)
+
+# Verify picked fish
+anita_10735_sw25_30_torun %>% 
+  count(`Stat Week`, gear)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Create a single THA Extraction data.frame
+rm(THA_torun_asl)
+THA_torun_asl <- bind_rows(lapply(objects(pattern = "torun"), get))
+
+# plates
+nrow(THA_torun_asl) / 95
+
+#
+THA_torun_asl %>% 
+  mutate(mixture = case_when(`Stat Area` == "10195" & `Stat Week` %in% 18:23 ~ "neets_sw18_23",
+                             `Stat Area` == "10195" & `Stat Week` %in% 24 ~ "neets_sw24",
+                             `Stat Area` == "10195" & `Stat Week` %in% 25:27 ~ "neets_sw25_27",
+                             `Stat Area` == "10735" & `Stat Week` %in% 20:21 ~ "anita_sw20_21",
+                             `Stat Area` == "10735" & `Stat Week` %in% 22 ~ "anita_sw22",
+                             `Stat Area` == "10735" & `Stat Week` %in% 23 ~ "anita_sw23",
+                             `Stat Area` == "10735" & `Stat Week` %in% 24 ~ "anita_sw24",
+                             `Stat Area` == "10735" & `Stat Week` %in% 25:30 ~ "anita_sw25_30")) %>% 
+  count(mixture)
+
+save_objects("THA_torun_asl", path = "../Objects")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Write THA Extraction List ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Format into the Extraction List Template
+load_objects("Objects")
+
+# Confirm that all `Dna Specimen No` are 6 characters before splitting
+table(nchar(THA_torun_asl$`Dna Specimen No`))
+
+# Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples
+# So the `Dna Specimen No` isn't enough for me to figure out the whole 10 digit WGC number
+# First check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits)
+
+THA_torun_asl %>% 
+  mutate(WGC_4digit = str_sub(`Dna Specimen No`, 1, 4)) %>%  # get last 4 digits of WGC
+  group_by(WGC_4digit) %>%  # group by those 4 digits
+  summarise(count = n_distinct(`Sample Date`)) %>%  # count unique sample dates
+  summarise(count = max(count)) # what is the maximum number of sample dates per unique 4 digit WGC, should be 1
+# good to go
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Pull tissue collection info from OceanAK and join, need full 10 digit WGC number and Sample number
+loki_tissue_THA <- read_csv(file = "../Associated Data/THA/GEN_SAMPLED_FISH_TISSUE_THA.csv")
+
+# Subset for variables of interest
+loki_tissue_THA <- loki_tissue_THA %>% 
+  filter(is.na(IS_MISSING_PAIRED_DATA_EXISTS)) %>%  # make sure we aren't issing the tissue
+  select(`Silly Code`, FK_FISH_ID, DNA_TRAY_CODE, DNA_TRAY_WELL_CODE, PK_TISSUE_TYPE) %>% 
+  mutate(WGC_4digit = str_sub(DNA_TRAY_CODE, 7, 10)) %>% 
+  mutate(WGC_2digit_pos = str_pad(string = DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  unite(dna_specimen_no, c(WGC_4digit, WGC_2digit_pos), sep = '', remove = FALSE) %>% 
+  mutate(dna_specimen_no = as.integer(dna_specimen_no))
+
+#~~~~~~~~~~~~~~~~~~
+## Are all my extraction fish in the LOKI tissue table?
+table(THA_torun_asl$`Dna Specimen No` %in% loki_tissue_THA$dna_specimen_no)  # 800 TRUE!!!!
+
+# Verify that we have the correct numbers of fish per fishery/quadrant
+THA_torun_asl %>% 
+  count(`Stat Area`, `Stat Week`) %>% 
+  spread(`Stat Week`, nn, fill = 0)
+
+# Overall, pretty good
+
+#~~~~~~~~~~~~~~~~~~
+## Join LOKI Tissue Table with ASL and format for Extraction List Template
+THA_torun_extraction <- THA_torun_asl %>% 
+  left_join(loki_tissue_THA, by = c(`Dna Specimen No` = "dna_specimen_no")) %>% 
+  mutate(`WELL CODE` = str_pad(DNA_TRAY_WELL_CODE, width = 2, side = "left", pad = 0)) %>% 
+  mutate(`TISSUE TYPE` = str_replace(PK_TISSUE_TYPE, pattern = " Process", replacement = "")) %>% 
+  mutate(`TISSUE TYPE` = str_replace(`TISSUE TYPE`, pattern = " Clip", replacement = "")) %>% 
+  rename(SILLY = `Silly Code`, `SAMPLE #` = FK_FISH_ID, `WGC BARCODE` = `DNA_TRAY_CODE`) %>% 
+  select(SILLY, `SAMPLE #`, `WGC BARCODE`, `WELL CODE`, `TISSUE TYPE`) %>% 
+  arrange(SILLY, `WGC BARCODE`, `WELL CODE`)
+
+write_csv(THA_torun_extraction, path = "../Extraction Lists/THA_Extraction.csv")
+
+THA_torun_extraction %>% 
   count(SILLY, `TISSUE TYPE`)

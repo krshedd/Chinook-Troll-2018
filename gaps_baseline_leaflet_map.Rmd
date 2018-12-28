@@ -1,0 +1,52 @@
+---
+title: "GAPS 3.0 Chinook Baseline Map"
+date: "`r paste(format(Sys.Date(), format = '%B %d, %Y'))`"
+output:
+  html_notebook:
+    theme: united
+    toc: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, message=FALSE, results='hide'}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(lubridate)
+library(leaflet)
+library(DT)
+
+source("~/../R/Functions.GCL.R")
+load_objects("../Objects/")
+```
+
+# Baseline information
+
+## Map of populations
+
+Here is map of all GAPS 3.0 Chinook salmonbaseline populations (excluding populations without reliable lat/long). **Note** this map is interactive, you can zoom (mouse wheel) and navigate (click and drag). If you click on a population, it will show the population name. Population numbers correspond to the map number (`map_no`) in the table below.
+```{r population_map_numbers, warning=FALSE, message=FALSE, fig.width=10, fig.height=12}
+gaps <- read_csv("../../../Baseline/GAPS3.0/GAPS3_357pops_33groups_coordinates.csv")
+
+colors8 <- c("cadetblue", "darkred", "green", "darkpurple", "blue", "orange", "purple", "red")
+color_tib8 <- tibble(driver = GroupNames8Pub, color = colors8)
+
+gaps <- gaps %>% 
+  mutate(map_no = seq_along(driver)) %>% 
+  left_join(color_tib8)
+
+icons <- awesomeIcons(icon = 'egg', iconColor = 'transparent', library = 'ion', markerColor = gaps$color)
+
+gaps %>% 
+  leaflet(width = "100%") %>% 
+  addTiles() %>% 
+  addAwesomeMarkers(~ long, ~ lat, icon = icons, label = ~ as.character(map_no), popup = ~ `Finest Scale`, labelOptions = labelOptions(noHide = TRUE, textOnly = TRUE, direction = "top")) %>% 
+  addLegend("bottomright", labels = GroupNames8Pub, colors = c(colors8[1:3], "purple", colors8[5:6], "violet", colors8[8]), opacity = 1)
+```
+
+## Table of population information
+
+Below is a table showing the populations in the baseline including collection date (some populations have multiple temporal collections), sample size (n), and reporting gorup.
+```{r population_table}
+gaps
+```

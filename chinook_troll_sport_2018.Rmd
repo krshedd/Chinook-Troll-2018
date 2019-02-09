@@ -1,0 +1,917 @@
+---
+title: "Chinook Troll + Sport AY 2018"
+output:
+  html_notebook:
+    theme: united
+    toc: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Introduction
+
+## Goals & Objectives
+
+The goal of this R Notebook is to analyze Chinook salmon mixtures from SEAK troll, sport, and THA fisheries for AY 2018. The individuals mixtures are indicated below by fishery:
+
+  * Troll
+    + Early Winter
+        - NO
+        - SONISI
+    + Late Winter
+        - NO
+        - SONISI
+    + Spring 1 (May)
+        - 10145 - 200 fish
+        - 10350 - 200 fish
+        - 11341 - 200 fish
+    + Spring 2 (June)
+        - 10145 - 200 fish
+        - 10350 - 200 fish
+        - 11301 - 200 fish
+        - 11341 - 200 fish
+        - 11362 - 200 fish
+    + Spring overall
+        - 11330 - 100 fish
+        - 18310 - 100 fish
+    + Summer 1
+        - NO
+        - SO
+        - NI
+        - SI
+    + Summer 2
+        - NO
+        - SO
+        - NI
+        - SI
+  * Sport
+    + Outside
+        - Through BW 13
+        - After BW 13
+    + Petersburg-Wrangell (PBG-WRN)
+    + Juneau (JNU)
+    + Ketchikan (KTN)
+    + Sitka (SIT)
+    + Craig (CRG)
+  * THA
+    + 10195 (Neets Bay)
+        - SW 18-23
+        - SW 24
+        - SW 25-27
+    + 10735 (Anita Bay)
+        - SW 20-21
+        - SW 22
+        - SW 23
+        - SW 24
+        - SW 25-30
+
+We are going to run everything for 33 reporting groups and then summarise from there for whoever needs it.
+
+## Outline
+
+This R Notebook will:
+
+1) Import mixture genotypes
+2) Join ASL
+3) Define mixture strata
+3) Data QA
+4) Create *BAYES* files
+5) Summarize *BAYES* results
+6) Output tables
+
+## Setup
+
+Load *GCL-R-Functions* and all necessary packages.
+```{r setup, message=FALSE, results='hide'}
+source("~/../R/Functions.GCL.R")
+library(tidyverse)
+library(lubridate)
+
+.username <- "krshedd"
+.password <- ""
+```
+
+Read in those objects and `LocusControl`
+```{r load_objects}
+load_objects("../Objects/")
+```
+
+
+# Winter troll: import mixture genotypes
+
+Read in genotypes from *LOKI* as `.gcl` objects. Save in directory.
+```{r winter_loki}
+# origins_sillys <- c("KTROL17EW", "KTROL18LW", "KTROL18SP", "KTROL18SU", "KSPORT18", "KTROL18THA", "KGILL18THA", "KSEIN18THA", "KSEIN18CR")
+winter_2018_sillys <- c("KTROL17EW", "KTROL18LW")
+LOKI2R_GAPS.GCL(sillyvec = winter_2018_sillys, username = .username, password = .password)
+rm(.username, .password)
+
+sapply(winter_2018_sillys, function(silly) {get(paste0(silly, ".gcl"))$n} )
+
+save_sillys(sillyvec = winter_2018_sillys, path = "../Genotypes/original")
+save_objects(objects = c("winter_2018_sillys"), path = "../Objects/")
+```
+
+# Join ASL
+
+## Winter Troll
+
+Read in the troll ASL data.
+```{r troll_asl, message=FALSE}
+(troll_ASL <- read_csv(file = "../ASL Data/20190204_troll_2017_2018_Detailed ASL Samples.csv") %>% 
+   select(`Sample Date`, `Stat Week`, `Port Code`, `Gear`, `District`, `Dna Specimen No`, `Cwt Strap Tag No`, `Gear Code`, `Harvest Code`))
+
+# Any duplicate Dna Specimen No?
+table(table(troll_ASL$`Dna Specimen No`, useNA = "always"), useNA = "always")
+```
+
+Shit, it looks like we have some duplicate Dna Specimen No (34 to be precise).
+```{r asl_duplicates}
+asl_duplicates <- troll_ASL %>% 
+  group_by(`Dna Specimen No`) %>% 
+  summarise(n = n()) %>% 
+  filter(n > 1) %>% 
+  pull(`Dna Specimen No`)
+
+troll_ASL %>% 
+  filter(`Dna Specimen No` %in% asl_duplicates) %>% 
+  arrange(`Dna Specimen No`)
+```
+
+Are any of these fish in our winter troll samples?
+```{r asl_duplicates_winter_troll}
+early_winter_samples <- KTROL17EW.gcl$attributes %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  pull(`Dna Specimen No`)
+
+any(early_winter_samples %in% asl_duplicates)
+
+late_winter_samples <- KTROL18LW.gcl$attributes %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  pull(`Dna Specimen No`)
+
+any(late_winter_samples %in% asl_duplicates)
+```
+
+Cool, none of our ASL duplicate Dna Specimen No are in there. Now verify that all winter samples are in the ASL data.
+```{r winter_in_asl}
+all(early_winter_samples %in% troll_ASL$`Dna Specimen No`)
+all(late_winter_samples %in% troll_ASL$`Dna Specimen No`)
+```
+
+Which early winter sample(s) are missing?
+```{r early_winter_missing}
+# Which sample is missing from ASL?
+(early_missing <- setdiff(early_winter_samples, troll_ASL$`Dna Specimen No`))
+
+# Does that WGC exist?
+troll_ASL %>% 
+  mutate(WGC_4char = str_sub(`Dna Specimen No`, 1, 4)) %>% 
+  filter(WGC_4char == str_sub(early_missing, 1, 4))
+
+# Did we extract this fish?
+EW_torun_ASL.df %>% 
+  filter(`Dna Specimen No` == early_missing)
+
+# Nope, we did not extract this fish
+setdiff(early_winter_samples, EW_torun_ASL.df$`Dna Specimen No`)
+
+# What fish did we attempt to extract, but not get?
+setdiff(EW_torun_ASL.df$`Dna Specimen No`, early_winter_samples)
+```
+
+WTF, what is the deal with this fish? Probably mixed up with 549901
+```{r early_winter_missing_cont}
+KTROL17EW.gcl$attributes %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  filter(`Dna Specimen No` %in% early_missing)
+
+troll_ASL %>% 
+  filter(`Dna Specimen No` == 549901)
+```
+
+I went out to the warehouse to pull the WGC and confirmed that the ASL data is incorrect, the card Dna Specimen No should be 459901, not 549901
+
+```{r early_winter_missing_fix}
+troll_ASL <- troll_ASL %>% 
+  mutate(`Dna Specimen No` = case_when(`Dna Specimen No` == 549901 ~ 459901,
+                                       TRUE ~ `Dna Specimen No`))
+```
+
+Now that we've resolved our ASL discrepancy, join with attributes to get quadrant level information.
+```{r join_winter_asl}
+# Join ASL with attributes table
+# Early Winter
+KTROL17EW.gcl$attributes <- KTROL17EW.gcl$attributes %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  left_join(troll_ASL, by = "Dna Specimen No")
+
+# Late Winter
+KTROL18LW.gcl$attributes <- KTROL18LW.gcl$attributes %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  left_join(troll_ASL, by = "Dna Specimen No")
+```
+
+How many fish per district?
+```{r winter_district_counts}
+KTROL17EW.gcl$attributes %>% 
+  count(District)
+
+KTROL18LW.gcl$attributes %>% 
+  count(District)
+```
+
+# Define mixture strata
+
+Winter mixtures are each quadrant by itself.
+
+Create early winter mixtures.
+```{r early_winter_define_mixtures}
+EWintNO_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 171)), nm = "KTROL17EW")
+PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintNO_2018.vials, newname = "EWintNO_2018")
+
+EWintSO_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 172)), nm = "KTROL17EW")
+PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintSO_2018.vials, newname = "EWintSO_2018")
+
+EWintNI_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 173)), nm = "KTROL17EW")
+PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintNI_2018.vials, newname = "EWintNI_2018")
+
+EWintSI_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 174)), nm = "KTROL17EW")
+PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintSI_2018.vials, newname = "EWintSI_2018")
+
+sapply(grep(pattern = "EWint", objects(pattern = "\\.gcl"), value = TRUE), function(silly) {get(silly)$n})
+```
+
+Create late winter mixtures.
+```{r late_winter_define_mixtures}
+LWintNO_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL18LW", attribute = "District", matching = 171)), nm = "KTROL18LW")
+PoolCollections.GCL(collections = "KTROL18LW", loci = GAPSLoci_reordered, IDs = LWintNO_2018.vials, newname = "LWintNO_2018")
+
+LWintSO_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL18LW", attribute = "District", matching = 172)), nm = "KTROL18LW")
+PoolCollections.GCL(collections = "KTROL18LW", loci = GAPSLoci_reordered, IDs = LWintSO_2018.vials, newname = "LWintSO_2018")
+
+LWintNI_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL18LW", attribute = "District", matching = 173)), nm = "KTROL18LW")
+PoolCollections.GCL(collections = "KTROL18LW", loci = GAPSLoci_reordered, IDs = LWintNI_2018.vials, newname = "LWintNI_2018")
+
+LWintSI_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL18LW", attribute = "District", matching = 174)), nm = "KTROL18LW")
+PoolCollections.GCL(collections = "KTROL18LW", loci = GAPSLoci_reordered, IDs = LWintSI_2018.vials, newname = "LWintSI_2018")
+
+sapply(grep(pattern = "LWint", objects(pattern = "\\.gcl"), value = TRUE), function(silly) {get(silly)$n})
+```
+
+Save genotypes for winter strata.
+```{r save_winter_strata_genotypes}
+if(!dir.exists("../Genotypes/strata")) {dir.create("../Genotypes/strata")}
+
+winter_2018_mixnames <- c(paste0("EWint", c("NO", "SO", "NI", "SI"), "_2018"), 
+                          paste0("LWint", c("NO", "SO", "NI", "SI"), "_2018"))
+
+save_objects(objects = "winter_2018_mixnames", path = "../Objects/")
+save_sillys(sillyvec = winter_2018_mixnames, path = "../Genotypes/strata/")
+```
+
+# Data QA
+
+Standard data QA:
+
+  * Remove fish missing <80% genotypes
+  * Remove duplicates (>95% genotype concordance)
+
+```{r QA}
+# original sample sizes
+winter_2018_sample_sizes <- tibble(silly = winter_2018_mixnames,
+                                   genotyped = sapply(winter_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# missing
+winter_2018_missing <- RemoveIndMissLoci.GCL(sillyvec = winter_2018_mixnames, proportion = 0.8)
+save_objects("winter_2018_missing", "../Objects/")
+
+winter_2018_sample_sizes <- winter_2018_sample_sizes %>% 
+  mutate(missing = genotyped - sapply(winter_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# duplicate
+winter_2018_duplicates <- CheckDupWithinSilly.GCL(sillyvec = winter_2018_mixnames, loci = GAPSLoci_reordered, quantile = NULL, minproportion = 0.95)
+(winter_2018_duplicates_summary <- sapply(winter_2018_mixnames, function(x) {winter_2018_duplicates[[x]]$report}))
+save_objects("winter_2018_duplicates_summary", "../Objects/")
+
+winter_2018_duplciates_removed <- RemoveDups.GCL(dupcheck = winter_2018_duplicates)
+
+winter_2018_sample_sizes <- winter_2018_sample_sizes %>% 
+  mutate(duplicate = genotyped - missing - sapply(winter_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# final
+winter_2018_sample_sizes <- winter_2018_sample_sizes %>% 
+  mutate(final = sapply(winter_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+winter_2018_sample_sizes
+save_objects("winter_2018_sample_sizes", "../Objects/")
+
+write_csv(winter_2018_sample_sizes, "../Tables/winter_2018_sample_sizes.csv")
+```
+
+Save post-QA genotypes
+```{r post_QA}
+if(!dir.exists("../Genotypes/strata_postQA/")) {dir.create("../Genotypes/strata_postQA/")}
+save_sillys(sillyvec = winter_2018_mixnames, path = "../Genotypes/strata_postQA")
+```
+
+# Create *BAYES* files
+
+## Directory setup
+
+First need to set up *BAYES* directory structure and copy over baseline file and *BAYES* objects. This was already done when we ran TBR.
+```{r BAYES_setup, results='hide'}
+# dir.create(path = "../BAYES")
+# sapply(c("Baseline", "Control", "Mixture", "Output"), function(folder) {dir.create(path = paste("../BAYES", folder, sep = "/"))} )
+# 
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/Objects/SEAKPops357.txt", to = "../Objects")
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/Objects/bayesfortran_357.txt", to = "../Objects")
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/BAYES/Baseline/GAPS357pops13loci.bse", to = "../BAYES/Baseline")
+# file.copy(from = "V:/Analysis/4_Westward/Sockeye/KMA Commercial Harvest 2014-2016/Mixtures/Objects/WASSIPSockeyeSeeds.txt", to = "../Objects")
+# 
+# TBR_mixnames <- setNames(c("D108Gill_2018", "D111Gill_2018", "D111Sport_2018"), TBR_sillys)
+# save_objects("TBR_mixnames", "../Objects/")
+# load_objects("../Objects/")
+```
+
+## Create mixtures
+
+Save the fortran format and create TBR *BAYES* mixture files. This was already done when we ran TBR.
+```{r BAYES_mixtures}
+# mixfortran <- CreateMixture.GCL(sillys = TBR_sillys[1], loci = GAPSLoci_reordered, IDs = NULL, mixname = TBR_mixnames[TBR_sillys[1]], dir = "../BAYES/Mixture", type = "BAYES", PT = FALSE)
+# save_objects("mixfortran", "../Objects/")
+
+sapply(winter_2018_mixnames, function(mix) {
+  CreateMixture.GCL(sillys = mix, loci = GAPSLoci_reordered, IDs = NULL, mixname = mix, dir = "../BAYES/Mixture", type = "BAYES", PT = FALSE)
+} )
+```
+
+## Create priors
+
+New this year, I will be analyzing **ALL** Chinook mixtures with the full 33 reporting groups. However, since I ran last year's troll mixtures for just the 26 reporting groups, I will have to mess with the priors a bit. Also a new wrinkle because we've previously ran NISISO together for Early and Late Winter. I think to keep things simple, I'll use the previous year's NISISO estimate for the prior for each of those respective quadrants (NI, SI, and SO)
+```{r read_2017_estimates}
+EWint_2017_26RG_EstimatesStats <- dget("../../SEAK17/Estimates objects/EWint_2017_26RG_EstimatesStats.txt")
+LWint_2017_26RG_EstimatesStats <- dget("../../SEAK17/Estimates objects/LWint_2017_26RG_EstimatesStats.txt")
+
+(winter_2017_means <- sapply(c(EWint_2017_26RG_EstimatesStats, LWint_2017_26RG_EstimatesStats), function(mix) {mix[, "mean"]}))
+```
+
+My plan is to keep the same prior for the 26 groups and then spread out the prior evenly across all other 33 reporting groups.
+```{r setup_2018_priors}
+# Convert from 26RG to 33RG
+winter_2017_means_33RG <- apply(winter_2017_means, 2, function(mix) {mix[GroupVec33RG_to26RG] / table(GroupVec33RG_to26RG)[GroupVec33RG_to26RG]} )
+rownames(winter_2017_means_33RG) <- GroupNames33
+
+# Duplicate NISISO to NI, SI, SO
+winter_2017_means_33RG <- winter_2017_means_33RG[, c(1, 2, 2, 2, 3, 4, 4, 4)]
+
+# Fix dimnames
+colnames(winter_2017_means_33RG) <- winter_2018_mixnames
+
+# Verify
+apply(winter_2017_means_33RG, 2, sum)
+```
+
+Now create 2018 priors.
+```{r create_2018_priors}
+winter_2018_priors <- apply(winter_2017_means_33RG, 2, function(mix) {
+  Prior.GCL(groupvec = GroupVec33RG_357, groupweights = mix, minval = 0.01)
+} )
+colnames(winter_2018_priors) <- winter_2018_mixnames
+save_objects("winter_2018_priors", "../Objects/")
+```
+
+## Create control files
+
+Now that we have priors, just need to create *BAYES* control files.
+```{r BAYES_control}
+sapply(winter_2018_mixnames, function(mix) {
+  CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = mix, basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                        nchains = 5, groupvec = GroupVec33RG_357, priorvec = winter_2018_priors[, mix], initmat = GAPS357PopsInits, 
+                        dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                        basefortran = bayesfortran_357, switches = "F T F T T T F")
+} )
+
+```
+
+## Create output directories
+
+```{r BAYES_output}
+sapply(winter_2018_mixnames, function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
+```
+
+# Summarize *BAYES* results
+
+Summarize results for both the full 33 reporting groups, the 5 TBR groups, 3 TBR groups, and 2 TBR groups.
+
+## 33 reporting groups
+
+Create standard summary and save.
+```{r winter_BAYES_summarise_33RG}
+# full 33 reporting groups
+EWint_2018_33RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output", mixvec = winter_2018_mixnames[1:4],
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+LWint_2018_33RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output", mixvec = winter_2018_mixnames[5:8],
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# dir.create("../Estimates objects")
+save_objects(c("EWint_2018_33RG_EstimatesStats", "LWint_2018_33RG_EstimatesStats"), "../Estimates objects")
+```
+
+Make in to tall tibble.
+```{r winter_BAYES_33RG_tibble}
+# make in to a tidy tibble (tall)
+winter_2018_33RG_estimates.tdy <- 
+  bind_rows(
+    lapply(winter_2018_mixnames, function(mix) {  # loop over mixture names
+      c(EWint_2018_33RG_EstimatesStats, LWint_2018_33RG_EstimatesStats)[[mix]] %>%  # for each matrix
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(mixname = mix) %>%  # make column for mixname
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    } )
+  ) %>% 
+  gather(estimator, value, -mixname, -group, - n_group) %>%  # gather all estimators
+  separate(mixname, c("mix", "year"), sep = "_", remove = FALSE) %>%  # extract mixture and year
+  separate(mix, c("fishery", "quadrant"), sep = 5) %>%  # extract district and gear
+  mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames33))  # factor for ordering
+
+save_objects(c("winter_2018_33RG_estimates.tdy"), "../Estimates objects")
+```
+
+
+# THA: import mixture genotypes
+
+Read in genotypes from *LOKI* as `.gcl` objects. Save in directory.
+```{r THA_loki}
+# origins_sillys <- c("KTROL17EW", "KTROL18LW", "KTROL18SP", "KTROL18SU", "KSPORT18", "KTROL18THA", "KGILL18THA", "KSEIN18THA")
+THA_2018_sillys <- c("KTROL18THA", "KGILL18THA", "KSEIN18THA")
+LOKI2R_GAPS.GCL(sillyvec = THA_2018_sillys, username = .username, password = .password)
+rm(.username, .password)
+
+sapply(THA_2018_sillys, function(silly) {get(paste0(silly, ".gcl"))$n} )
+
+save_sillys(sillyvec = THA_2018_sillys, path = "../Genotypes/original")
+save_objects(objects = c("THA_2018_sillys"), path = "../Objects/")
+```
+
+# Join ASL
+
+## THA
+
+Read in the THA ASL data.
+```{r THA_asl, message=FALSE}
+(THA_ASL <- read_csv(file = "../ASL Data/20181213_terminal_Harvest - Detailed ASL Samples.csv") %>% 
+   select(`Sample Date`, `Stat Week`, `Port Code`, `Gear`, `Stat Area`, `Dna Specimen No`, `Cwt Strap Tag No`, `Gear Code`, `Harvest Code`))
+
+# Any duplicate Dna Specimen No?
+table(table(THA_ASL$`Dna Specimen No`, useNA = "always"), useNA = "always")
+```
+
+Nope, no duplicates, great news.
+```{r asl_duplicates_THA_troll}
+THA_samples <- bind_rows(KTROL18THA.gcl$attributes, KGILL18THA.gcl$attributes, KSEIN18THA.gcl$attributes) %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  pull(`Dna Specimen No`)
+```
+
+Cool, none of our ASL duplicate Dna Specimen No are in there. Now verify that all winter samples are in the ASL data.
+```{r THA_in_asl}
+all(THA_samples %in% THA_ASL$`Dna Specimen No`)
+```
+
+Now that we've verified that all genotyped samples are in the ASL data, pool all sillys into one THA silly, then join with attributes to get quadrant level information.
+```{r join_THA_asl}
+# Pool
+PoolCollections.GCL(collections = THA_2018_sillys, loci = GAPSLoci_reordered, newname = "KTHA18")
+
+# Join ASL with attributes table
+KTHA18.gcl$attributes <- KTHA18.gcl$attributes %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  left_join(THA_ASL, by = "Dna Specimen No")
+```
+
+How many fish per stat area by gear and stat week?
+```{r THA_stat_area_counts}
+KTHA18.gcl$attributes %>% 
+  count(Gear, `Stat Week`, `Stat Area`) %>% 
+  spread(`Stat Week`, n) %>% 
+  arrange(`Stat Area`)
+```
+
+Create a variable for mixture for ease of pooling into separate mixtures.
+```{r THA_attributes_mixture}
+KTHA18.gcl$attributes <- KTHA18.gcl$attributes %>% 
+  mutate(mixture = case_when(`Stat Area` == "101-95" & `Stat Week` %in% 18:23 ~ "neets_sw18_23",
+                             `Stat Area` == "101-95" & `Stat Week` %in% 24 ~ "neets_sw24",
+                             `Stat Area` == "101-95" & `Stat Week` %in% 25:27 ~ "neets_sw25_27",
+                             `Stat Area` == "107-35" & `Stat Week` %in% 20:21 ~ "anita_sw20_21",
+                             `Stat Area` == "107-35" & `Stat Week` %in% 22 ~ "anita_sw22",
+                             `Stat Area` == "107-35" & `Stat Week` %in% 23 ~ "anita_sw23",
+                             `Stat Area` == "107-35" & `Stat Week` %in% 24 ~ "anita_sw24",
+                             `Stat Area` == "107-35" & `Stat Week` %in% 25:30 ~ "anita_sw25_30"))
+
+KTHA18.gcl$attributes %>% 
+  count(mixture)
+```
+
+
+# Define mixture strata
+
+THA mixtures are each stat area and stat week. Each mixture has ~ 100 fish. We are doing 3 mixtures for Neets Bay (101-95) and 5 mixtures for Anita Bay (107-35).
+
+  * THA
+    + 10195 (Neets Bay)
+        - SW 18-23
+        - SW 24
+        - SW 25-27
+    + 10735 (Anita Bay)
+        - SW 20-21
+        - SW 22
+        - SW 23
+        - SW 24
+        - SW 25-30
+
+Create THA mixtures.
+```{r THA_define_mixtures}
+Neets_SW18_23.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTHA18", attribute = "mixture", matching = "neets_sw18_23")), nm = "KTHA18")
+PoolCollections.GCL(collections = "KTHA18", loci = GAPSLoci_reordered, IDs = Neets_SW18_23.vials, newname = "Neets_SW18_23")
+
+Neets_SW24.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTHA18", attribute = "mixture", matching = "neets_sw24")), nm = "KTHA18")
+PoolCollections.GCL(collections = "KTHA18", loci = GAPSLoci_reordered, IDs = Neets_SW24.vials, newname = "Neets_SW24")
+
+Neets_SW25_27.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTHA18", attribute = "mixture", matching = "neets_sw25_27")), nm = "KTHA18")
+PoolCollections.GCL(collections = "KTHA18", loci = GAPSLoci_reordered, IDs = Neets_SW25_27.vials, newname = "Neets_SW25_27")
+
+Anita_SW20_21.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTHA18", attribute = "mixture", matching = "anita_sw20_21")), nm = "KTHA18")
+PoolCollections.GCL(collections = "KTHA18", loci = GAPSLoci_reordered, IDs = Anita_SW20_21.vials, newname = "Anita_SW20_21")
+
+Anita_SW22.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTHA18", attribute = "mixture", matching = "anita_sw22")), nm = "KTHA18")
+PoolCollections.GCL(collections = "KTHA18", loci = GAPSLoci_reordered, IDs = Anita_SW22.vials, newname = "Anita_SW22")
+
+Anita_SW23.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTHA18", attribute = "mixture", matching = "anita_sw23")), nm = "KTHA18")
+PoolCollections.GCL(collections = "KTHA18", loci = GAPSLoci_reordered, IDs = Anita_SW23.vials, newname = "Anita_SW23")
+
+Anita_SW24.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTHA18", attribute = "mixture", matching = "anita_sw24")), nm = "KTHA18")
+PoolCollections.GCL(collections = "KTHA18", loci = GAPSLoci_reordered, IDs = Anita_SW24.vials, newname = "Anita_SW24")
+
+Anita_SW25_30.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTHA18", attribute = "mixture", matching = "anita_sw25_30")), nm = "KTHA18")
+PoolCollections.GCL(collections = "KTHA18", loci = GAPSLoci_reordered, IDs = Anita_SW25_30.vials, newname = "Anita_SW25_30")
+
+sapply(grep(pattern = "_SW", objects(pattern = "\\.gcl"), value = TRUE), function(silly) {get(silly)$n})
+```
+
+Save genotypes for THA strata.
+```{r save_THA_strata_genotypes}
+if(!dir.exists("../Genotypes/strata")) {dir.create("../Genotypes/strata")}
+
+THA_2018_mixnames <- gsub(pattern = ".gcl", replacement = '', x = grep(pattern = "_SW", objects(pattern = "\\.gcl"), value = TRUE))
+
+save_objects(objects = "THA_2018_mixnames", path = "../Objects/")
+save_sillys(sillyvec = THA_2018_mixnames, path = "../Genotypes/strata/")
+```
+
+# Data QA
+
+Standard data QA:
+
+  * Remove fish missing <80% genotypes
+  * Remove duplicates (>95% genotype concordance)
+
+```{r THA_QA}
+# original sample sizes
+THA_2018_sample_sizes <- tibble(silly = THA_2018_mixnames,
+                                genotyped = sapply(THA_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# missing
+THA_2018_missing <- RemoveIndMissLoci.GCL(sillyvec = THA_2018_mixnames, proportion = 0.8)
+save_objects("THA_2018_missing", "../Objects/")
+
+THA_2018_sample_sizes <- THA_2018_sample_sizes %>% 
+  mutate(missing = genotyped - sapply(THA_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# duplicate
+THA_2018_duplicates <- CheckDupWithinSilly.GCL(sillyvec = THA_2018_mixnames, loci = GAPSLoci_reordered, quantile = NULL, minproportion = 0.95)
+(THA_2018_duplicates_summary <- sapply(THA_2018_mixnames, function(x) {THA_2018_duplicates[[x]]$report}))
+save_objects("THA_2018_duplicates_summary", "../Objects/")
+
+THA_2018_duplciates_removed <- RemoveDups.GCL(dupcheck = THA_2018_duplicates)
+
+THA_2018_sample_sizes <- THA_2018_sample_sizes %>% 
+  mutate(duplicate = genotyped - missing - sapply(THA_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# final
+THA_2018_sample_sizes <- THA_2018_sample_sizes %>% 
+  mutate(final = sapply(THA_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+THA_2018_sample_sizes
+save_objects("THA_2018_sample_sizes", "../Objects/")
+
+write_csv(THA_2018_sample_sizes, "../Tables/THA_2018_sample_sizes.csv")
+```
+
+Save post-QA genotypes
+```{r THA_post_QA}
+if(!dir.exists("../Genotypes/strata_postQA/")) {dir.create("../Genotypes/strata_postQA/")}
+save_sillys(sillyvec = THA_2018_mixnames, path = "../Genotypes/strata_postQA")
+```
+
+# Create *BAYES* files
+
+## Directory setup
+
+First need to set up *BAYES* directory structure and copy over baseline file and *BAYES* objects. This was already done when we ran TBR.
+```{r THA_BAYES_setup, results='hide'}
+# dir.create(path = "../BAYES")
+# sapply(c("Baseline", "Control", "Mixture", "Output"), function(folder) {dir.create(path = paste("../BAYES", folder, sep = "/"))} )
+# 
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/Objects/SEAKPops357.txt", to = "../Objects")
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/Objects/bayesfortran_357.txt", to = "../Objects")
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/BAYES/Baseline/GAPS357pops13loci.bse", to = "../BAYES/Baseline")
+# file.copy(from = "V:/Analysis/4_Westward/Sockeye/KMA Commercial Harvest 2014-2016/Mixtures/Objects/WASSIPSockeyeSeeds.txt", to = "../Objects")
+# 
+# TBR_mixnames <- setNames(c("D108Gill_2018", "D111Gill_2018", "D111Sport_2018"), TBR_sillys)
+# save_objects("TBR_mixnames", "../Objects/")
+# load_objects("../Objects/")
+```
+
+## Create mixtures
+
+Save the fortran format and create TBR *BAYES* mixture files. This was already done when we ran TBR.
+```{r THA_BAYES_mixtures}
+# mixfortran <- CreateMixture.GCL(sillys = TBR_sillys[1], loci = GAPSLoci_reordered, IDs = NULL, mixname = TBR_mixnames[TBR_sillys[1]], dir = "../BAYES/Mixture", type = "BAYES", PT = FALSE)
+# save_objects("mixfortran", "../Objects/")
+
+sapply(THA_2018_mixnames, function(mix) {
+  CreateMixture.GCL(sillys = mix, loci = GAPSLoci_reordered, IDs = NULL, mixname = mix, dir = "../BAYES/Mixture", type = "BAYES", PT = FALSE)
+} )
+```
+
+## Create priors
+
+New this year, I will be analyzing **ALL** Chinook mixtures with the full 33 reporting groups. Also a new wrinkle because we've never ran any THA mixtures, I'm not entirely sure what to use as a good prior. After talking with Sara, we agreed to do a rolling prior. For the first mixture for each area, we agreed to put 90% of the prior weight on the reporting group for the brood source released in each location (Neets-Chickamin and Anita-Andrew) and spread the rest out among all other reporting groups. Not ideal, but better than a group flat prior or anything else we could think of.
+
+Now create 2018 priors.
+```{r THA_create_2018_priors}
+# Put prior weight on Andrew Creek for Anita (Andrew brood source)
+Anita_SW20_21_2018_prior <- Prior.GCL(groupvec = GroupVec33RG_357, groupweights = as.numeric(GroupNames33 == "Andrew"), minval = 0.003125) # this puts 90% prior weight on Andrew
+
+# Put prior weight on SSEAK for Neets (Chickamin brood source)
+Neets_SW18_23_2018_prior <- Prior.GCL(groupvec = GroupVec33RG_357, groupweights = as.numeric(GroupNames33 == "SSEAK"), minval = 0.003125) # this puts 90% prior weight on SSEAK
+
+save_objects(c("Anita_SW20_21_2018_prior", "Neets_SW18_23_2018_prior"), "../Objects/")
+```
+
+## Create control files
+
+Now that we have priors, just need to create *BAYES* control files for the first Neets and Anita runs.
+```{r THA_BAYES_control}
+CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = "Anita_SW20_21", basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                      nchains = 5, groupvec = GroupVec33RG_357, priorvec = Anita_SW20_21_2018_prior, initmat = GAPS357PopsInits, 
+                      dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                      basefortran = bayesfortran_357, switches = "F T F T T T F")
+
+CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = "Neets_SW18_23", basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                      nchains = 5, groupvec = GroupVec33RG_357, priorvec = Neets_SW18_23_2018_prior, initmat = GAPS357PopsInits, 
+                      dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                      basefortran = bayesfortran_357, switches = "F T F T T T F")
+```
+
+## Create output directories
+
+```{r THA_BAYES_output}
+sapply(winter_2018_mixnames, function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
+```
+
+# Spring troll: import mixture genotypes
+
+Read in genotypes from *LOKI* as `.gcl` objects. Save in directory.
+```{r spring_loki}
+# origins_sillys <- c("KTROL17EW", "KTROL18LW", "KTROL18SP", "KTROL18SU", "KSPORT18", "KTROL18THA", "KGILL18THA", "KSEIN18THA")
+spring_2018_sillys <- c("KTROL18SP")
+LOKI2R_GAPS.GCL(sillyvec = spring_2018_sillys, username = .username, password = .password)
+rm(.username, .password)
+
+sapply(spring_2018_sillys, function(silly) {get(paste0(silly, ".gcl"))$n} )
+
+save_sillys(sillyvec = spring_2018_sillys, path = "../Genotypes/original")
+save_objects(objects = c("spring_2018_sillys"), path = "../Objects/")
+```
+
+# Join ASL
+
+## Spring Troll
+
+Read in the troll ASL data.
+```{r spring_asl, message=FALSE}
+(spring_ASL <- read_csv(file = "../ASL Data/2018 Spring Troll Chinook ASLDist Subdistrict.csv") %>% 
+   select(`Sample Date`, `Stat Week`, `Port Code`, `Gear`, `District`, `Dna Specimen No`, `Cwt Strap Tag No`, `Gear Code`, `Harvest Code`))
+
+# Any duplicate Dna Specimen No?
+table(table(spring_ASL$`Dna Specimen No`, useNA = "always"), useNA = "always")
+```
+
+Shit, it looks like we have some duplicate Dna Specimen No (34 to be precise).
+```{r spring_asl_duplicates}
+asl_duplicates <- spring_ASL %>% 
+  group_by(`Dna Specimen No`) %>% 
+  summarise(n = n()) %>% 
+  filter(n > 1) %>% 
+  pull(`Dna Specimen No`)
+
+spring_ASL %>% 
+  filter(`Dna Specimen No` %in% asl_duplicates) %>% 
+  arrange(`Dna Specimen No`)
+```
+
+Are any of these fish in our winter troll samples?
+```{r asl_duplicates_spring_troll}
+spring_samples <- KTROL17SP.gcl$attributes %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  pull(`Dna Specimen No`)
+
+any(spring_samples %in% asl_duplicates)
+```
+
+Cool, none of our ASL duplicate Dna Specimen No are in there. Now verify that all winter samples are in the ASL data.
+```{r spring_in_asl}
+all(spring_samples %in% spring_ASL$`Dna Specimen No`)
+```
+
+Now that we've resolved our ASL discrepancy, join with attributes to get quadrant level information.
+```{r join_spring_asl}
+# Join ASL with attributes table
+# Early Winter
+KTROL18SP.gcl$attributes <- KTROL18SP.gcl$attributes %>% 
+  mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
+  left_join(spring_ASL, by = "Dna Specimen No")
+```
+
+How many fish per district?
+```{r spring_stat_area_counts}
+KTROL18SP.gcl$attributes %>% 
+  count(stat_area)
+```
+
+# Define mixture strata
+
+Spring mixtures are each stat area and month by itself.
+
+Create spring mixtures.
+```{r spring_define_mixtures}
+EWintNO_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 171)), nm = "KTROL17EW")
+PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintNO_2018.vials, newname = "EWintNO_2018")
+
+EWintSO_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 172)), nm = "KTROL17EW")
+PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintSO_2018.vials, newname = "EWintSO_2018")
+
+EWintNI_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 173)), nm = "KTROL17EW")
+PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintNI_2018.vials, newname = "EWintNI_2018")
+
+EWintSI_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 174)), nm = "KTROL17EW")
+PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintSI_2018.vials, newname = "EWintSI_2018")
+
+sapply(grep(pattern = "EWint", objects(pattern = "\\.gcl"), value = TRUE), function(silly) {get(silly)$n})
+```
+
+Save genotypes for spring strata.
+```{r save_spring_strata_genotypes}
+if(!dir.exists("../Genotypes/strata")) {dir.create("../Genotypes/strata")}
+
+spring_2018_mixnames <- c(paste0("EWint", c("NO", "SO", "NI", "SI"), "_2018"), 
+                          paste0("LWint", c("NO", "SO", "NI", "SI"), "_2018"))
+
+save_objects(objects = "spring_2018_mixnames", path = "../Objects/")
+save_sillys(sillyvec = spring_2018_mixnames, path = "../Genotypes/strata/")
+```
+
+# Data QA
+
+Standard data QA:
+
+  * Remove fish missing <80% genotypes
+  * Remove duplicates (>95% genotype concordance)
+
+```{r spring_QA}
+# original sample sizes
+spring_2018_sample_sizes <- tibble(silly = spring_2018_mixnames,
+                                   genotyped = sapply(spring_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# missing
+spring_2018_missing <- RemoveIndMissLoci.GCL(sillyvec = spring_2018_mixnames, proportion = 0.8)
+save_objects("spring_2018_missing", "../Objects/")
+
+spring_2018_sample_sizes <- spring_2018_sample_sizes %>% 
+  mutate(missing = genotyped - sapply(spring_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# duplicate
+spring_2018_duplicates <- CheckDupWithinSilly.GCL(sillyvec = spring_2018_mixnames, loci = GAPSLoci_reordered, quantile = NULL, minproportion = 0.95)
+(spring_2018_duplicates_summary <- sapply(spring_2018_mixnames, function(x) {spring_2018_duplicates[[x]]$report}))
+save_objects("spring_2018_duplicates_summary", "../Objects/")
+
+spring_2018_duplciates_removed <- RemoveDups.GCL(dupcheck = spring_2018_duplicates)
+
+spring_2018_sample_sizes <- spring_2018_sample_sizes %>% 
+  mutate(duplicate = genotyped - missing - sapply(spring_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# final
+spring_2018_sample_sizes <- spring_2018_sample_sizes %>% 
+  mutate(final = sapply(spring_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+spring_2018_sample_sizes
+save_objects("spring_2018_sample_sizes", "../Objects/")
+
+write_csv(spring_2018_sample_sizes, "../Tables/spring_2018_sample_sizes.csv")
+```
+
+Save post-QA genotypes
+```{r spring_post_QA}
+if(!dir.exists("../Genotypes/strata_postQA/")) {dir.create("../Genotypes/strata_postQA/")}
+save_sillys(sillyvec = spring_2018_mixnames, path = "../Genotypes/strata_postQA")
+```
+
+# Create *BAYES* files
+
+## Directory setup
+
+First need to set up *BAYES* directory structure and copy over baseline file and *BAYES* objects. This was already done when we ran TBR.
+```{r spring_BAYES_setup, results='hide'}
+# dir.create(path = "../BAYES")
+# sapply(c("Baseline", "Control", "Mixture", "Output"), function(folder) {dir.create(path = paste("../BAYES", folder, sep = "/"))} )
+# 
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/Objects/SEAKPops357.txt", to = "../Objects")
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/Objects/bayesfortran_357.txt", to = "../Objects")
+# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/BAYES/Baseline/GAPS357pops13loci.bse", to = "../BAYES/Baseline")
+# file.copy(from = "V:/Analysis/4_Westward/Sockeye/KMA Commercial Harvest 2014-2016/Mixtures/Objects/WASSIPSockeyeSeeds.txt", to = "../Objects")
+# 
+# TBR_mixnames <- setNames(c("D108Gill_2018", "D111Gill_2018", "D111Sport_2018"), TBR_sillys)
+# save_objects("TBR_mixnames", "../Objects/")
+# load_objects("../Objects/")
+```
+
+## Create mixtures
+
+Save the fortran format and create TBR *BAYES* mixture files. This was already done when we ran TBR.
+```{r spring_BAYES_mixtures}
+# mixfortran <- CreateMixture.GCL(sillys = TBR_sillys[1], loci = GAPSLoci_reordered, IDs = NULL, mixname = TBR_mixnames[TBR_sillys[1]], dir = "../BAYES/Mixture", type = "BAYES", PT = FALSE)
+# save_objects("mixfortran", "../Objects/")
+
+sapply(spring_2018_mixnames, function(mix) {
+  CreateMixture.GCL(sillys = mix, loci = GAPSLoci_reordered, IDs = NULL, mixname = mix, dir = "../BAYES/Mixture", type = "BAYES", PT = FALSE)
+} )
+```
+
+## Create priors
+
+New this year, I will be analyzing **ALL** Chinook mixtures with the full 33 reporting groups. However, since I ran last year's troll mixtures for just the 26 reporting groups, I will have to mess with the priors a bit. Also a new wrinkle because we've previously ran NISISO together for Early and Late Winter. I think to keep things simple, I'll use the previous year's NISISO estimate for the prior for each of those respective quadrants (NI, SI, and SO)
+```{r spring_read_2017_estimates}
+Spring_2017_26RG_EstimatesStats <- dget("../../SEAK17/Estimates objects/Spring_2017_26RG_StratifiedEstimatesStats.txt")
+
+(winter_2017_means <- sapply(c(EWint_2017_26RG_EstimatesStats, LWint_2017_26RG_EstimatesStats), function(mix) {mix[, "mean"]}))
+```
+
+My plan is to keep the same prior for the 26 groups and then spread out the prior evenly across all other 33 reporting groups.
+```{r spring_setup_2018_priors}
+# Convert from 26RG to 33RG
+winter_2017_means_33RG <- apply(winter_2017_means, 2, function(mix) {mix[GroupVec33RG_to26RG] / table(GroupVec33RG_to26RG)[GroupVec33RG_to26RG]} )
+rownames(winter_2017_means_33RG) <- GroupNames33
+
+# Duplicate NISISO to NI, SI, SO
+winter_2017_means_33RG <- winter_2017_means_33RG[, c(1, 2, 2, 2, 3, 4, 4, 4)]
+
+# Fix dimnames
+colnames(winter_2017_means_33RG) <- winter_2018_mixnames
+
+# Verify
+apply(winter_2017_means_33RG, 2, sum)
+```
+
+Now create 2018 priors.
+```{r spring_create_2018_priors}
+winter_2018_priors <- apply(winter_2017_means_33RG, 2, function(mix) {
+  Prior.GCL(groupvec = GroupVec33RG_357, groupweights = mix, minval = 0.01)
+} )
+colnames(winter_2018_priors) <- winter_2018_mixnames
+save_objects("winter_2018_priors", "../Objects/")
+```
+
+## Create control files
+
+Now that we have priors, just need to create *BAYES* control files.
+```{r spring_BAYES_control}
+sapply(winter_2018_mixnames, function(mix) {
+  CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = mix, basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                        nchains = 5, groupvec = GroupVec33RG_357, priorvec = winter_2018_priors[, mix], initmat = GAPS357PopsInits, 
+                        dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                        basefortran = bayesfortran_357, switches = "F T F T T T F")
+} )
+
+```
+
+## Create output directories
+
+```{r spring_BAYES_output}
+sapply(winter_2018_mixnames, function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
+```
+
+

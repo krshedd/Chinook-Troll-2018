@@ -681,8 +681,195 @@ CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname
 ## Create output directories
 
 ```{r THA_BAYES_output}
-sapply(winter_2018_mixnames, function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
+sapply(THA_2018_mixnames, function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
 ```
+
+## Summarize *BAYES* output for rolling prior
+
+Need to quickly summarize the output from Anita_SW20_21 and Neets_SW18_23 for rolling prior.
+```{r THA_rolling_prior_1}
+Anita_SW20_21_estimates_33RG <- CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, 
+                                                             maindir = "../BAYES/Output/", mixvec = THA_2018_mixnames[1],
+                                                             prior = '', ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1,
+                                                             PosteriorOutput = FALSE)
+
+Anita_SW22_2018_prior <- Prior.GCL(groupvec = GroupVec33RG_357, groupweights = Anita_SW20_21_estimates_33RG[[1]][, "mean"], minval = 0.01)
+save_objects(objects = "Anita_SW22_2018_prior", path = "../Objects/")
+
+CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = "Anita_SW22", basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                      nchains = 5, groupvec = GroupVec33RG_357, priorvec = Anita_SW22_2018_prior, initmat = GAPS357PopsInits, 
+                      dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                      basefortran = bayesfortran_357, switches = "F T F T T T F")
+
+
+Neets_SW18_23_estimates_33RG <- CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, 
+                                                             maindir = "../BAYES/Output/", mixvec = THA_2018_mixnames[6],
+                                                             prior = '', ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1,
+                                                             PosteriorOutput = FALSE)
+
+Neets_SW24_2018_prior <- Prior.GCL(groupvec = GroupVec33RG_357, groupweights = Neets_SW18_23_estimates_33RG[[1]][, "mean"], minval = 0.01)
+save_objects(objects = "Neets_SW24_2018_prior", path = "../Objects/")
+
+CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = "Neets_SW24", basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                      nchains = 5, groupvec = GroupVec33RG_357, priorvec = Neets_SW24_2018_prior, initmat = GAPS357PopsInits, 
+                      dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                      basefortran = bayesfortran_357, switches = "F T F T T T F")
+```
+
+Need to quickly summarize the output from Anita_SW22 and Neets_SW24 for rolling prior.
+```{r THA_rolling_prior_2}
+Anita_SW22_estimates_33RG <- CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, 
+                                                          maindir = "../BAYES/Output/", mixvec = THA_2018_mixnames[2],
+                                                          prior = '', ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1,
+                                                          PosteriorOutput = FALSE)
+
+Anita_SW23_2018_prior <- Prior.GCL(groupvec = GroupVec33RG_357, groupweights = Anita_SW22_estimates_33RG[[1]][, "mean"], minval = 0.01)
+save_objects(objects = "Anita_SW23_2018_prior", path = "../Objects/")
+
+CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = "Anita_SW23", basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                      nchains = 5, groupvec = GroupVec33RG_357, priorvec = Anita_SW23_2018_prior, initmat = GAPS357PopsInits, 
+                      dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                      basefortran = bayesfortran_357, switches = "F T F T T T F")
+
+
+Neets_SW24_estimates_33RG <- CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, 
+                                                          maindir = "../BAYES/Output/", mixvec = THA_2018_mixnames[7],
+                                                          prior = '', ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1,
+                                                          PosteriorOutput = FALSE)
+
+Neets_SW25_27_2018_prior <- Prior.GCL(groupvec = GroupVec33RG_357, groupweights = Neets_SW24_estimates_33RG[[1]][, "mean"], minval = 0.01)
+save_objects(objects = "Neets_SW25_27_2018_prior", path = "../Objects/")
+
+CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = "Neets_SW25_27", basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                      nchains = 5, groupvec = GroupVec33RG_357, priorvec = Neets_SW25_27_2018_prior, initmat = GAPS357PopsInits, 
+                      dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                      basefortran = bayesfortran_357, switches = "F T F T T T F")
+```
+
+Need to quickly summarize the output from Anita_SW23 for rolling prior.
+```{r THA_rolling_prior_3}
+Anita_SW23_estimates_33RG <- CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, 
+                                                          maindir = "../BAYES/Output/", mixvec = THA_2018_mixnames[3],
+                                                          prior = '', ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1,
+                                                          PosteriorOutput = FALSE)
+
+Anita_SW24_2018_prior <- Prior.GCL(groupvec = GroupVec33RG_357, groupweights = Anita_SW23_estimates_33RG[[1]][, "mean"], minval = 0.01)
+save_objects(objects = "Anita_SW24_2018_prior", path = "../Objects/")
+
+CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = "Anita_SW24", basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                      nchains = 5, groupvec = GroupVec33RG_357, priorvec = Anita_SW24_2018_prior, initmat = GAPS357PopsInits, 
+                      dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                      basefortran = bayesfortran_357, switches = "F T F T T T F")
+```
+
+Need to quickly summarize the output from Anita_SW24 for rolling prior.
+```{r THA_rolling_prior_4}
+Anita_SW24_estimates_33RG <- CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, 
+                                                          maindir = "../BAYES/Output/", mixvec = THA_2018_mixnames[4],
+                                                          prior = '', ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1,
+                                                          PosteriorOutput = FALSE)
+
+Anita_SW25_30_2018_prior <- Prior.GCL(groupvec = GroupVec33RG_357, groupweights = Anita_SW24_estimates_33RG[[1]][, "mean"], minval = 0.01)
+save_objects(objects = "Anita_SW25_30_2018_prior", path = "../Objects/")
+
+CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = "Anita_SW25_30", basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                      nchains = 5, groupvec = GroupVec33RG_357, priorvec = Anita_SW25_30_2018_prior, initmat = GAPS357PopsInits, 
+                      dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                      basefortran = bayesfortran_357, switches = "F T F T T T F")
+```
+
+# Summarize *BAYES* results
+
+Summarize results for both the full 33 reporting groups and the custom 5 THA reporting groups.
+
+## 33 reporting groups
+
+Create standard summary and tall tibble, save both.
+```{r BAYES_summarise_THA_33RG}
+# full 33 reporting groups
+THA_2018_33RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output", mixvec = THA_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# make in to a tidy tibble (tall)
+THA_2018_33RG_estimates.tdy <- 
+  bind_rows(
+    lapply(THA_2018_mixnames, function(mix) {  # loop over mixture names
+      THA_2018_33RG_EstimatesStats[[mix]] %>%  # for each matrix
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(mixname = mix) %>%  # make column for mixname
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    } )
+  ) %>% 
+  gather(estimator, value, -mixname, -group, - n_group) %>%  # gather all estimators
+  separate(mixname, c("THA", "SW_range"), sep = "_SW", remove = FALSE) %>%  # extract mixture and year
+  mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames33))  # factor for ordering
+
+save_objects(c("THA_2018_33RG_EstimatesStats", "THA_2018_33RG_estimates.tdy"), "../Estimates objects")
+```
+
+## 5 THA reporting groups
+
+Create standard summary and tall tibble, save both.
+```{r BAYES_summarise_THA_5RG}
+GroupNames5_THA <- c("Andrew", "TBR", "SSEAK", "Other SEAK", "Other")
+GroupVec5RG_THA_33 <- c(4, 2, 4, 4, 2, 1, 2, 3, rep(5, 25))
+
+THA_2018_5RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = GroupVec5RG_THA_33, groupnames = GroupNames5_THA, maindir = "../BAYES/Output", 
+                               mixvec = THA_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# make in to a tidy tibble (tall)
+THA_2018_5RG_estimates.tdy <- 
+  bind_rows(
+    lapply(THA_2018_mixnames, function(mix) {  # loop over mixture names
+      THA_2018_5RG_EstimatesStats[[mix]] %>%  # for each matrix
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(mixname = mix) %>%  # make column for mixname
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    } )
+  ) %>% 
+  gather(estimator, value, -mixname, -group, - n_group) %>%  # gather all estimators
+  separate(mixname, c("THA", "SW_range"), sep = "_SW", remove = FALSE) %>%  # extract mixture and year
+  mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames5_THA))  # factor for ordering
+
+save_objects(c("GroupNames5_THA", "GroupVec5RG_THA_33"), "../Objects")
+save_objects(c("THA_2018_5RG_EstimatesStats", "THA_2018_5RG_estimates.tdy"), "../Estimates objects")
+```
+
+# Plot THA 5RG
+
+```{r THA_plots}
+THA_2018_5RG_estimates.tdy %>% 
+  mutate(value = value * 100) %>% 
+  spread(estimator, value) %>% 
+  filter(THA == "Anita") %>% 
+  ggplot(aes(x = SW_range, y = mean, group = group, fill = group)) +
+  geom_col(width = 0.7, position = position_dodge(0.8)) +
+  geom_errorbar(aes(ymin = `5%`, ymax = `95%`), width = 0.4, position = position_dodge(0.8)) +
+  ylim(c(0, 100)) +
+  ylab("Stock Composition (%)") +
+  xlab("Stat Week Range") +
+  guides(fill = guide_legend(title = "Reporting Group")) +
+  facet_grid(. ~ THA)
+
+THA_2018_5RG_estimates.tdy %>% 
+  mutate(value = value * 100) %>% 
+  spread(estimator, value) %>% 
+  filter(THA == "Neets") %>% 
+  ggplot(aes(x = SW_range, y = mean, group = group, fill = group)) +
+  geom_col(width = 0.7, position = position_dodge(0.8)) +
+  geom_errorbar(aes(ymin = `5%`, ymax = `95%`), width = 0.4, position = position_dodge(0.8)) +
+  ylim(c(0, 100)) +
+  ylab("Stock Composition (%)") +
+  xlab("Stat Week Range") +
+  guides(fill = guide_legend(title = "Reporting Group")) +
+  facet_grid(. ~ THA)
+```
+
 
 # Spring troll: import mixture genotypes
 
@@ -706,13 +893,13 @@ save_objects(objects = c("spring_2018_sillys"), path = "../Objects/")
 Read in the troll ASL data.
 ```{r spring_asl, message=FALSE}
 (spring_ASL <- read_csv(file = "../ASL Data/2018 Spring Troll Chinook ASLDist Subdistrict.csv") %>% 
-   select(`Sample Date`, `Stat Week`, `Port Code`, `Gear`, `District`, `Dna Specimen No`, `Cwt Strap Tag No`, `Gear Code`, `Harvest Code`))
+   select(`Sample Date`, `Stat Week`, `Port Code`, `Gear`, `Quadrant`, `District`, `Sub/District`, `Dna Specimen No`, `Cwt Strap Tag No`))
 
 # Any duplicate Dna Specimen No?
 table(table(spring_ASL$`Dna Specimen No`, useNA = "always"), useNA = "always")
 ```
 
-Shit, it looks like we have some duplicate Dna Specimen No (34 to be precise).
+Shit, it looks like we have some duplicate Dna Specimen No (1 to be precise). Resolved.
 ```{r spring_asl_duplicates}
 asl_duplicates <- spring_ASL %>% 
   group_by(`Dna Specimen No`) %>% 
@@ -725,33 +912,47 @@ spring_ASL %>%
   arrange(`Dna Specimen No`)
 ```
 
-Are any of these fish in our winter troll samples?
+Are any of these fish in our spring troll samples?
 ```{r asl_duplicates_spring_troll}
-spring_samples <- KTROL17SP.gcl$attributes %>% 
+spring_samples <- KTROL18SP.gcl$attributes %>% 
   mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
   pull(`Dna Specimen No`)
 
 any(spring_samples %in% asl_duplicates)
 ```
 
-Cool, none of our ASL duplicate Dna Specimen No are in there. Now verify that all winter samples are in the ASL data.
+Yes, this sample is in there twice, they are clearly different fish. One has scale card number 4, the other has 8, I will change the fish with scale card 8 to 587408 in the .csv file.
+
+Cool, none of our ASL duplicate Dna Specimen No are in there. Now verify that all spring samples are in the ASL data.
 ```{r spring_in_asl}
 all(spring_samples %in% spring_ASL$`Dna Specimen No`)
 ```
 
-Now that we've resolved our ASL discrepancy, join with attributes to get quadrant level information.
+Excellent, all samples accounted for!!!
+
+Need to fix Month so it doesn't rely solely on Sample Date, (some fish sampled on June 1 were harvested in May).
+```{r spring_asl_statarea}
+spring_ASL <- spring_ASL %>% 
+  mutate(Subdistrict = str_pad(string = `Sub/District`, width = 2, side = "left", pad = 0)) %>% 
+  unite(`Stat Area`, c("District", "Subdistrict"), sep = "", remove = FALSE) %>% 
+  mutate(`Sample Date` = mdy(`Sample Date`)) %>% 
+  mutate(Month = month(`Sample Date`, label = TRUE, abbr = FALSE))
+```
+
+Now that we've resolved our ASL discrepancy, join with attributes to get stat area level information.
 ```{r join_spring_asl}
 # Join ASL with attributes table
-# Early Winter
+# Spring
 KTROL18SP.gcl$attributes <- KTROL18SP.gcl$attributes %>% 
   mutate(`Dna Specimen No` = as.integer(paste0(str_sub(DNA_TRAY_CODE, 7, 10), str_pad(DNA_TRAY_WELL_CODE, 2, "left", "0")))) %>% 
   left_join(spring_ASL, by = "Dna Specimen No")
 ```
 
-How many fish per district?
+How many fish per stat area and month??
 ```{r spring_stat_area_counts}
 KTROL18SP.gcl$attributes %>% 
-  count(stat_area)
+  count(`Stat Area`, Month) %>% 
+  spread(Month, n, fill = 0)
 ```
 
 # Define mixture strata

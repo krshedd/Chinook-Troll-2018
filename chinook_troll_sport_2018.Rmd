@@ -955,33 +955,55 @@ KTROL18SP.gcl$attributes %>%
   spread(Month, n, fill = 0)
 ```
 
+Whoops, some fish from 113-41 were sampled in "June", but harvested in "May". This is an artifact of when the fishery closed and opened back up (113-41 closed on 5/31, and re-opened on 6/4).
+```{r spring_11341_june}
+KTROL18SP.gcl$attributes <- KTROL18SP.gcl$attributes %>% 
+  mutate(Month = case_when(`Stat Area` == "11341" & `Sample Date` == as_date("2018-06-01") ~ 
+                             month(as_date("2018-05-31"), label = TRUE, abbr = FALSE),
+                            TRUE ~ Month))
+
+KTROL18SP.gcl$attributes %>% 
+  count(`Stat Area`, Month) %>% 
+  spread(Month, n, fill = 0)
+```
+
+
 # Define mixture strata
 
-Spring mixtures are each stat area and month by itself.
+Spring mixtures are each stat area and month by itself (except 113-30 and 183-10, which are combined for May and June). Use `case_when` to creat an attribute in the attributes table for mixture.
+```{r spring_mixture_attribute}
+KTROL18SP.gcl$attributes <- KTROL18SP.gcl$attributes %>% 
+  mutate(mixname = case_when(`Stat Area` == "10145" & Month == "May" ~ "SpringRet1_10145_2018",
+                             `Stat Area` == "10145" & Month == "June" ~ "SpringRet2_10145_2018",
+                             `Stat Area` == "10350" & Month == "May" ~ "SpringRet1_10350_2018",
+                             `Stat Area` == "10350" & Month == "June" ~ "SpringRet2_10350_2018",
+                             `Stat Area` == "11301" & Month == "June" ~ "SpringRet2_11301_2018",
+                             `Stat Area` == "11330" ~ "Spring_11330_2018",
+                             `Stat Area` == "11341" & Month == "May" ~ "SpringRet1_11341_2018",
+                             `Stat Area` == "11341" & Month == "June" ~ "SpringRet2_11341_2018",
+                             `Stat Area` == "11362" & Month == "June" ~ "SpringRet2_11362_2018",
+                             `Stat Area` == "18310" ~ "Spring_18310_2018",
+                             TRUE ~ as.character(NA)))
+
+KTROL18SP.gcl$attributes %>% 
+  count(mixname)
+```
 
 Create spring mixtures.
 ```{r spring_define_mixtures}
-EWintNO_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 171)), nm = "KTROL17EW")
-PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintNO_2018.vials, newname = "EWintNO_2018")
+spring_2018_mixnames <- sort(unique(KTROL18SP.gcl$attributes$mixname))
 
-EWintSO_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 172)), nm = "KTROL17EW")
-PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintSO_2018.vials, newname = "EWintSO_2018")
+sapply(spring_2018_mixnames, function(mixname) {
+  ids <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL18SP", attribute = "mixname", matching = mixname)), nm = "KTROL18SP")
+  PoolCollections.GCL(collections = "KTROL18SP", loci = GAPSLoci_reordered, IDs = ids, newname = mixname)
+})
 
-EWintNI_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 173)), nm = "KTROL17EW")
-PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintNI_2018.vials, newname = "EWintNI_2018")
-
-EWintSI_2018.vials <- setNames(object = list(AttributesToIDs.GCL(silly = "KTROL17EW", attribute = "District", matching = 174)), nm = "KTROL17EW")
-PoolCollections.GCL(collections = "KTROL17EW", loci = GAPSLoci_reordered, IDs = EWintSI_2018.vials, newname = "EWintSI_2018")
-
-sapply(grep(pattern = "EWint", objects(pattern = "\\.gcl"), value = TRUE), function(silly) {get(silly)$n})
+sapply(spring_2018_mixnames, function(silly) {get(paste0(silly, ".gcl"))$n} )
 ```
 
 Save genotypes for spring strata.
 ```{r save_spring_strata_genotypes}
 if(!dir.exists("../Genotypes/strata")) {dir.create("../Genotypes/strata")}
-
-spring_2018_mixnames <- c(paste0("EWint", c("NO", "SO", "NI", "SI"), "_2018"), 
-                          paste0("LWint", c("NO", "SO", "NI", "SI"), "_2018"))
 
 save_objects(objects = "spring_2018_mixnames", path = "../Objects/")
 save_sillys(sillyvec = spring_2018_mixnames, path = "../Genotypes/strata/")
@@ -1036,19 +1058,6 @@ save_sillys(sillyvec = spring_2018_mixnames, path = "../Genotypes/strata_postQA"
 ## Directory setup
 
 First need to set up *BAYES* directory structure and copy over baseline file and *BAYES* objects. This was already done when we ran TBR.
-```{r spring_BAYES_setup, results='hide'}
-# dir.create(path = "../BAYES")
-# sapply(c("Baseline", "Control", "Mixture", "Output"), function(folder) {dir.create(path = paste("../BAYES", folder, sep = "/"))} )
-# 
-# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/Objects/SEAKPops357.txt", to = "../Objects")
-# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/Objects/bayesfortran_357.txt", to = "../Objects")
-# file.copy(from = "V:/Analysis/1_SEAK/Chinook/Baseline/GAPS3.0/BAYES/Baseline/GAPS357pops13loci.bse", to = "../BAYES/Baseline")
-# file.copy(from = "V:/Analysis/4_Westward/Sockeye/KMA Commercial Harvest 2014-2016/Mixtures/Objects/WASSIPSockeyeSeeds.txt", to = "../Objects")
-# 
-# TBR_mixnames <- setNames(c("D108Gill_2018", "D111Gill_2018", "D111Sport_2018"), TBR_sillys)
-# save_objects("TBR_mixnames", "../Objects/")
-# load_objects("../Objects/")
-```
 
 ## Create mixtures
 
@@ -1064,55 +1073,62 @@ sapply(spring_2018_mixnames, function(mix) {
 
 ## Create priors
 
-New this year, I will be analyzing **ALL** Chinook mixtures with the full 33 reporting groups. However, since I ran last year's troll mixtures for just the 26 reporting groups, I will have to mess with the priors a bit. Also a new wrinkle because we've previously ran NISISO together for Early and Late Winter. I think to keep things simple, I'll use the previous year's NISISO estimate for the prior for each of those respective quadrants (NI, SI, and SO)
+New this year, I will be analyzing **ALL** Chinook mixtures with the full 33 reporting groups. However, since I ran last year's troll mixtures for just the 26 reporting groups, I will have to mess with the priors a bit. Also a new wrinkle because are running by stat area this year (some are just May - Ret1, some are just June - Ret2, and some are both). Use stratified spring NO for 183-10 and 113-30, otherwise use previous years Ret1 or Ret2 by quad for the quad corresponding to the correct stat area.
 ```{r spring_read_2017_estimates}
-Spring_2017_26RG_EstimatesStats <- dget("../../SEAK17/Estimates objects/Spring_2017_26RG_StratifiedEstimatesStats.txt")
+SpringRet1_2017_26RG_EstimatesStats <- dget("../../SEAK17/Estimates objects/SpringRet1_2017_26RG_EstimatesStats.txt")
+SpringRet2_2017_26RG_EstimatesStats <- dget("../../SEAK17/Estimates objects/SpringRet2_2017_26RG_EstimatesStats.txt")
+SpringNO_2017_26RG_EstimatesStats <- list("SpringNO_2017" = dget("../../SEAK17/Estimates objects/SpringNO_2017_26RG_StratifiedEstimatesStats.txt"))
 
-(winter_2017_means <- sapply(c(EWint_2017_26RG_EstimatesStats, LWint_2017_26RG_EstimatesStats), function(mix) {mix[, "mean"]}))
+spring_2017_means <- sapply(c(SpringRet1_2017_26RG_EstimatesStats, 
+                               SpringRet2_2017_26RG_EstimatesStats, 
+                               SpringNO_2017_26RG_EstimatesStats), function(mix) {
+  mix[, "mean"]
+} )
+
+dimnames(spring_2017_means)
 ```
 
 My plan is to keep the same prior for the 26 groups and then spread out the prior evenly across all other 33 reporting groups.
 ```{r spring_setup_2018_priors}
 # Convert from 26RG to 33RG
-winter_2017_means_33RG <- apply(winter_2017_means, 2, function(mix) {mix[GroupVec33RG_to26RG] / table(GroupVec33RG_to26RG)[GroupVec33RG_to26RG]} )
-rownames(winter_2017_means_33RG) <- GroupNames33
+spring_2017_means_33RG <- apply(spring_2017_means, 2, function(mix) {mix[GroupVec33RG_to26RG] / table(GroupVec33RG_to26RG)[GroupVec33RG_to26RG]} )
+rownames(spring_2017_means_33RG) <- GroupNames33
 
 # Duplicate NISISO to NI, SI, SO
-winter_2017_means_33RG <- winter_2017_means_33RG[, c(1, 2, 2, 2, 3, 4, 4, 4)]
+spring_2017_means_33RG <- spring_2017_means_33RG[, c(9, 9, 3, 4, 2, 7, 8, 6, 6, 6)]
 
 # Fix dimnames
-colnames(winter_2017_means_33RG) <- winter_2018_mixnames
+colnames(spring_2017_means_33RG) <- spring_2018_mixnames
 
 # Verify
-apply(winter_2017_means_33RG, 2, sum)
+apply(spring_2017_means_33RG, 2, sum)
 ```
 
 Now create 2018 priors.
 ```{r spring_create_2018_priors}
-winter_2018_priors <- apply(winter_2017_means_33RG, 2, function(mix) {
+spring_2018_priors <- apply(spring_2017_means_33RG, 2, function(mix) {
   Prior.GCL(groupvec = GroupVec33RG_357, groupweights = mix, minval = 0.01)
 } )
-colnames(winter_2018_priors) <- winter_2018_mixnames
-save_objects("winter_2018_priors", "../Objects/")
+colnames(spring_2018_priors) <- spring_2018_mixnames
+save_objects("spring_2018_priors", "../Objects/")
 ```
 
 ## Create control files
 
 Now that we have priors, just need to create *BAYES* control files.
 ```{r spring_BAYES_control}
-sapply(winter_2018_mixnames, function(mix) {
+sapply(spring_2018_mixnames, function(mix) {
   CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = mix, basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
-                        nchains = 5, groupvec = GroupVec33RG_357, priorvec = winter_2018_priors[, mix], initmat = GAPS357PopsInits, 
+                        nchains = 5, groupvec = GroupVec33RG_357, priorvec = spring_2018_priors[, mix], initmat = GAPS357PopsInits, 
                         dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
                         basefortran = bayesfortran_357, switches = "F T F T T T F")
 } )
-
 ```
 
 ## Create output directories
 
 ```{r spring_BAYES_output}
-sapply(winter_2018_mixnames, function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
+sapply(spring_2018_mixnames, function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
 ```
 
 

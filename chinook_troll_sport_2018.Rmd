@@ -1211,6 +1211,33 @@ spring_2018_33RG_estimates.tdy %>%
 
 This is why we report to Interior Columbia Su/Fa, not to summer and fall separately.
 
+## 5 reporting groups
+
+Create standard summary and tall tibble, save both.
+```{r BAYES_summarise_spring_5RG}
+Spring_2018_5RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = GroupVec5RG_THA_33, groupnames = GroupNames5_THA, maindir = "../BAYES/Output", 
+                               mixvec = spring_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# make in to a tidy tibble (tall)
+spring_2018_5RG_estimates.tdy <- 
+  bind_rows(
+    lapply(spring_2018_mixnames, function(mix) {  # loop over mixture names
+      c(Spring_2018_5RG_EstimatesStats)[[mix]] %>%  # for each matrix
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(mixname = mix) %>%  # make column for mixname
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    } )
+  ) %>% 
+  gather(estimator, value, -mixname, -group, - n_group) %>%  # gather all estimators
+  separate(mixname, c("period", "stat_area", "year"), sep = "_", remove = FALSE) %>%  # extract mixture and year
+  mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames5_THA))  # factor for ordering
+
+save_objects(c("Spring_2018_5RG_EstimatesStats", "spring_2018_5RG_estimates.tdy"), "../Estimates objects")
+```
+
 # Harvest - Spring troll
 
 Read in harvest data

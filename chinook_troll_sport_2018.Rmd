@@ -1496,3 +1496,83 @@ sapply(summer_2018_mixnames[1:4], function(mix) {
 ```{r summer_BAYES_output}
 sapply(summer_2018_mixnames[1:4], function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
 ```
+
+# Summarize *BAYES* results
+
+Summarize results for both the full 33 reporting groups, the 5 TBR groups, 3 TBR groups, and 2 TBR groups.
+
+## 33 reporting groups
+
+Create standard summary and save.
+```{r summer_ret1_BAYES_summarise_33RG}
+# full 33 reporting groups
+SummerRet1_2018_33RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output", mixvec = summer_2018_mixnames[1:4],
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# dir.create("../Estimates objects")
+save_objects(c("SummerRet1_2018_33RG_EstimatesStats"), "../Estimates objects")
+```
+
+Check Gelman-Rubin
+```{r summer_ret1_GR_33RG}
+any(sapply(SummerRet1_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} ) > 1.2)
+sum(sapply(SummerRet1_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} ) > 1.2)
+sapply(SummerRet1_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} )
+```
+
+Just Alsek in NO quadrant, estimate is super low, so no big deal.
+```{r}
+SummerRet1_2018_33RG_EstimatesStats[["SummerRet1NO_2018"]]["Alsek", ]
+```
+
+# Create *BAYES* files
+
+## Create priors for Ret2
+
+New this year, I will be analyzing **ALL** Chinook mixtures with the full 33 reporting groups. However, since I ran last year's troll mixtures for just the 26 reporting groups, I will have to mess with the priors a bit. 
+
+Use 2018 Retention 1 as a prior for Retention 2.
+```{r summer_ret1_read_2018_estimates}
+summer_ret1_2018_means_33RG <- sapply(c(SummerRet1_2018_33RG_EstimatesStats), function(mix) {
+  mix[, "mean"]
+} )
+
+dimnames(summer_ret1_2018_means_33RG)
+```
+
+My plan is to keep the same prior for the 26 groups and then spread out the prior evenly across all other 33 reporting groups.
+```{r summer_ret2_setup_2018_priors}
+# Fix dimnames
+colnames(summer_ret1_2018_means_33RG) <- summer_2018_mixnames[5:8]
+
+# Verify
+apply(summer_ret1_2018_means_33RG, 2, sum)
+```
+
+Now create 2018 priors.
+```{r summer_ret2_create_2018_priors}
+summer_ret2_2018_priors <- apply(summer_ret1_2018_means_33RG, 2, function(mix) {
+  Prior.GCL(groupvec = GroupVec33RG_357, groupweights = mix, minval = 0.01)
+} )
+colnames(summer_ret2_2018_priors) <- summer_2018_mixnames[5:8]
+save_objects("summer_ret2_2018_priors", "../Objects/")
+```
+
+## Create control files
+
+Now that we have priors, just need to create *BAYES* control files.
+```{r summer_ret2_BAYES_control}
+sapply(summer_2018_mixnames[5:8], function(mix) {
+  CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = mix, basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                        nchains = 5, groupvec = GroupVec33RG_357, priorvec = summer_ret2_2018_priors[, mix], initmat = GAPS357PopsInits, 
+                        dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                        basefortran = bayesfortran_357, switches = "F T F T T T F")
+} )
+```
+
+## Create output directories
+
+```{r summer_BAYES_output}
+sapply(summer_2018_mixnames[5:8], function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
+```

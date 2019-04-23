@@ -1573,6 +1573,557 @@ sapply(summer_2018_mixnames[5:8], function(mix) {
 
 ## Create output directories
 
-```{r summer_BAYES_output}
+```{r summer_ret2_BAYES_output}
 sapply(summer_2018_mixnames[5:8], function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
+```
+
+# Summarize *BAYES* results
+
+Summarize results for both the full 33 reporting groups, the 5 TBR groups, 3 TBR groups, and 2 TBR groups.
+
+## 33 reporting groups
+
+Create standard summary and save.
+```{r summer_ret2_BAYES_summarise_33RG}
+# full 33 reporting groups
+SummerRet2_2018_33RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output", mixvec = summer_2018_mixnames[5:8],
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# dir.create("../Estimates objects")
+save_objects(c("SummerRet2_2018_33RG_EstimatesStats"), "../Estimates objects")
+```
+
+Check Gelman-Rubin
+```{r summer_ret2_GR_33RG}
+any(sapply(SummerRet2_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} ) > 1.2)
+sum(sapply(SummerRet2_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} ) > 1.2)
+sapply(SummerRet2_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} )
+```
+
+Just NThompson, WCascadeSp, and LoColFa in SO quadrant, estimate is super low (other than LoColFa), so not a huge deal.
+```{r}
+SummerRet2_2018_33RG_EstimatesStats[["SummerRet2SO_2018"]][c("NThompson", "WCascadeSp", "LoColFa"), ]
+```
+
+## 33 reporting groups
+
+Create standard summary and save for all Summer (Ret1 + Ret2).
+```{r summer_BAYES_summarise_33RG}
+# full 33 reporting groups
+Summer_2018_33RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output", mixvec = summer_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# dir.create("../Estimates objects")
+save_objects(c("Summer_2018_33RG_EstimatesStats"), "../Estimates objects")
+```
+
+Make in to tall tibble.
+```{r summer_BAYES_33RG_tibble}
+# make in to a tidy tibble (tall)
+summer_2018_33RG_estimates.tdy <- 
+  bind_rows(
+    lapply(summer_2018_mixnames, function(mix) {  # loop over mixture names
+      c(Summer_2018_33RG_EstimatesStats)[[mix]] %>%  # for each matrix
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(mixname = mix) %>%  # make column for mixname
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    } )
+  ) %>% 
+  gather(estimator, value, -mixname, -group, - n_group) %>%  # gather all estimators
+  separate(mixname, c("mix", "year"), sep = "_", remove = FALSE) %>%  # extract mixture and year
+  separate(mix, c("fishery", "quadrant"), sep = 10) %>%  # extract district and gear
+  mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames33))  # factor for ordering
+
+save_objects(c("summer_2018_33RG_estimates.tdy"), "../Estimates objects")
+```
+
+Check GR
+```{r summer_GR}
+summer_2018_33RG_estimates.tdy %>% 
+  filter(estimator == "GR") %>% 
+  filter(value > 1.2)
+```
+
+## 5 reporting groups
+
+Create standard summary and tall tibble, save both.
+```{r BAYES_summarise_summer_5RG}
+Summer_2018_5RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = GroupVec5RG_THA_33, groupnames = GroupNames5_THA, maindir = "../BAYES/Output", 
+                               mixvec = summer_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# make in to a tidy tibble (tall)
+summer_2018_5RG_estimates.tdy <- 
+  bind_rows(
+    lapply(summer_2018_mixnames, function(mix) {  # loop over mixture names
+      c(Summer_2018_5RG_EstimatesStats)[[mix]] %>%  # for each matrix
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(mixname = mix) %>%  # make column for mixname
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    } )
+  ) %>% 
+  gather(estimator, value, -mixname, -group, - n_group) %>%  # gather all estimators
+  separate(mixname, c("mix", "year"), sep = "_", remove = FALSE) %>%  # extract mixture and year
+  separate(mix, c("fishery", "quadrant"), sep = 10) %>%  # extract district and gear
+  mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames5_THA))  # factor for ordering
+
+save_objects(c("Summer_2018_5RG_EstimatesStats", "summer_2018_5RG_estimates.tdy"), "../Estimates objects")
+```
+
+# Sport troll: import mixture genotypes
+
+Read in genotypes from *LOKI* as `.gcl` objects. Save in directory.
+```{r sport_loki}
+# origins_sillys <- c("KTROL17EW", "KTROL18LW", "KTROL18SP", "KTROL18SU", "KSPORT18", "KTROL18THA", "KGILL18THA", "KSEIN18THA")
+sport_2018_sillys <- c("KSPORT18")
+LOKI2R_GAPS.GCL(sillyvec = sport_2018_sillys, username = .username, password = .password)
+rm(.username, .password)
+
+sapply(sport_2018_sillys, function(silly) {get(paste0(silly, ".gcl"))$n} )
+
+save_sillys(sillyvec = sport_2018_sillys, path = "../Genotypes/original")
+save_objects(objects = c("sport_2018_sillys"), path = "../Objects/")
+```
+
+# Join ASL
+
+## Sport Troll
+
+Read in the troll ASL data.
+```{r sport_asl, message=FALSE}
+(sport_ASL <- read_csv(file = "../ASL Data/_2018_SEAK_SF_Whatman_AWL_10OCT18.csv") %>% 
+   select(Year, SITE, DATE, BIWEEK, STATWEEK, SPECCODE, LENGTH, Whatman_Card, SAMPLE_NO, Adipose_Clipped, DISTRICT, STAT_AREA, Stat_Area_label) %>% 
+   mutate(WGC = str_pad(Whatman_Card, 10, "left", "0")) %>% 
+   unite(fish_id, c("WGC", "SAMPLE_NO"), sep = "_", remove = FALSE) %>% 
+   filter(SPECCODE == 410) %>%
+   filter(!is.na(SAMPLE_NO)) %>%
+   mutate(site = factor(SITE, c("JUNEAU", "KETCHIKAN", "WRANGELL", "PETERSBURG", "SITKA", "CRAIG_KLAWOCK", "GUSTAVUS", "ELFIN_COVE", "YAKUTAT"))) %>% 
+   rename(biweek = BIWEEK) %>% 
+   mutate(fishery = case_when(site == "KETCHIKAN" ~ "KTN",
+                              site %in% c("PETERSBURG", "WRANGELL") ~ "PB-WR",
+                              site == "JUNEAU" ~ "Inside",
+                              site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek <= 13 ~ "Outside_early",
+                              site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek > 13 ~ "Outside_late")) %>% 
+   mutate(fishery = factor(fishery, levels = c("KTN", "PB-WR", "Inside", "Outside_early", "Outside_late")))
+)
+
+# Any duplicate Dna Specimen No?
+table(table(sport_ASL$fish_id, useNA = "always"), useNA = "always")
+```
+
+No duplicates, great. Get the fish_id for the fish we ran and verify that all sport samples are in the ASL data.
+```{r sport_in_asl}
+sport_samples <- KSPORT18.gcl$attributes %>% 
+  unite(fish_id, c("DNA_TRAY_CODE", "DNA_TRAY_WELL_CODE"), sep = "_", remove = FALSE) %>% 
+  pull(fish_id)
+
+all(sport_samples %in% sport_ASL$fish_id)
+
+setdiff(sport_samples, sport_ASL$fish_id)
+```
+
+Excellent, all samples accounted for (except for two 411s)!!
+
+Join with attributes to get port and biweek level information.
+```{r join_sport_asl}
+# Join ASL with attributes table
+# Sport
+KSPORT18.gcl$attributes <- KSPORT18.gcl$attributes %>% 
+  unite(fish_id, c("DNA_TRAY_CODE", "DNA_TRAY_WELL_CODE"), sep = "_", remove = FALSE) %>% 
+  left_join(sport_ASL, by = "fish_id")
+```
+
+How many fish per Port and Biweek?
+```{r sport_stat_area_counts}
+KSPORT18.gcl$attributes %>% 
+  count(site, biweek) %>% 
+  spread(site, n, fill = 0)
+```
+
+Looks good! Lost some fish in the genotyping process, but not too many.
+
+# Define mixture strata
+
+## Simple mixtures
+
+Sport mixtures are by port and biweek, some mixtures are overlapping. Use `case_when` to creat an attribute in the attributes table for "simple" mixtures. Verify samples per biweek by cross checking with ExtractionLists.R. **Note** can't have mixname for other = NA, it messes up `AttributesToIDs`.
+```{r sport_mixture_attribute}
+KSPORT18.gcl$attributes <- KSPORT18.gcl$attributes %>% 
+  mutate(mixname = case_when(site == "CRAIG_KLAWOCK" ~ "CRGSport_2018",
+                             site == "SITKA" ~ "SITSport_2018",
+                             site == "KETCHIKAN" ~ "KTNSport_2018",
+                             TRUE ~ "complex_mixture"))
+
+KSPORT18.gcl$attributes %>% 
+  count(mixname)
+```
+
+We lost some Craig, Ketchikan, and Sitka fish during genotyping, but not enough to redefine the mixtures. These should be good to go.
+
+Create sport mixtures.
+```{r sport_define_mixtures}
+sport_2018_mixnames <- sort(unique(KSPORT18.gcl$attributes$mixname))[-1]
+
+sapply(sport_2018_mixnames, function(mixname) {
+  ids <- setNames(object = list(AttributesToIDs.GCL(silly = "KSPORT18", attribute = "mixname", matching = mixname)), nm = "KSPORT18")
+  PoolCollections.GCL(collections = "KSPORT18", loci = GAPSLoci_reordered, IDs = ids, newname = mixname)
+})
+
+sapply(sport_2018_mixnames, function(silly) {get(paste0(silly, ".gcl"))$n} )
+```
+
+Save genotypes for sport strata.
+```{r save_sport_strata_genotypes}
+if(!dir.exists("../Genotypes/strata")) {dir.create("../Genotypes/strata")}
+
+# save_objects(objects = "sport_2018_mixnames", path = "../Objects/")
+save_sillys(sillyvec = sport_2018_mixnames, path = "../Genotypes/strata/")
+```
+
+## Complex mixtures
+
+Need to thin out PBG/WRN + Inside (too many fish run for TBR), also need to thin SIT and CRG for Outside Period 1 and 2.
+
+Get harvest information and join with ASL in order to recreate what was used in ExtractionLists.R
+
+```{r sport_asl_harvest_join}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in ASL data
+asl_sport <- read_csv(file = "../ASL Data/_2018_SEAK_SF_Whatman_AWL_10OCT18.csv")
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate ASL data
+# Filter for just species 410 (legal), only DNA sampled
+asl_sport <- asl_sport %>% 
+  filter(SPECCODE == 410) %>% 
+  filter(!is.na(SAMPLE_NO))
+
+# Make SITE a factor for ordering purposes
+asl_sport <- asl_sport %>% 
+  mutate(site = factor(SITE, c("JUNEAU", "KETCHIKAN", "WRANGELL", "PETERSBURG", "SITKA", "CRAIG_KLAWOCK", "GUSTAVUS", "ELFIN_COVE", "YAKUTAT"))) %>% 
+  rename(biweek = BIWEEK)
+
+# Create a variable for Fishery
+asl_sport <- asl_sport %>% 
+  mutate(fishery = case_when(site == "KETCHIKAN" ~ "KTN",
+                             site %in% c("PETERSBURG", "WRANGELL") ~ "PB-WR",
+                             site == "JUNEAU" ~ "Inside",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek <= 13 ~ "Outside_early",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek > 13 ~ "Outside_late")) %>% 
+  mutate(fishery = factor(fishery, levels = c("KTN", "PB-WR", "Inside", "Outside_early", "Outside_late")))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Read in Harvest data
+# By Site and Biweek
+harvest_sport <- read_csv(file = "../Harvest Data/preliminary_2018_sport_harvest_chinook.csv")
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate harvest data
+# Make data tall (tidy), recode sites to ALL CAPS
+level_key <- list("Juneau" = "JUNEAU", 
+                  "Ketchikan" = "KETCHIKAN", 
+                  "Wrangell" = "WRANGELL", 
+                  "Petersburg" = "PETERSBURG", 
+                  "Sitka" = "SITKA", 
+                  "Craig" = "CRAIG_KLAWOCK", 
+                  "Gustavus" = "GUSTAVUS", 
+                  "Elfin Cove" = "ELFIN_COVE", 
+                  "Yakutat" = "YAKUTAT")
+
+harvest_sport <- harvest_sport %>% 
+  gather(site, harvest, -biweek) %>% 
+  mutate(site = recode_factor(site, !!!level_key, .ordered = TRUE))
+
+# Create a variable for Fishery
+harvest_sport <- harvest_sport %>% 
+  mutate(fishery = case_when(site == "KETCHIKAN" ~ "KTN",
+                             site %in% c("PETERSBURG", "WRANGELL") ~ "PB-WR",
+                             site == "JUNEAU" ~ "Inside",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek <= 13 ~ "Outside_early",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek > 13 ~ "Outside_late")) %>% 
+  mutate(fishery = factor(fishery, levels = c("KTN", "PB-WR", "Inside", "Outside_early", "Outside_late")))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Join ASL and Harvest data by Site and Biweek
+# Roll up ASL to biweek and site level, join with harvest
+join_sport <- asl_sport %>% 
+  count(site, biweek) %>% 
+  full_join(harvest_sport, by = c("site", "biweek")) %>%  # very important to do a full join in case some weeks are missing harvest or samples
+  replace_na(list(n = 0, harvest = 0))  # replace NA in samples and harvest with 0
+```
+
+### Inside
+
+What was the plan (i.e. ideal mixture sample size per biweek)?
+```{r sport_inside_mixture_ideal}
+# What does proportional sampling look like?
+(extraction_JNU <- join_sport %>% 
+   filter(site == "JUNEAU") %>% 
+   arrange(biweek) %>% 
+   mutate(p_harvest = round(harvest / sum(harvest) * 190)) %>%  # if we want 190 samples proportional to harvest by SW
+   mutate(n_sufficeint = n >= p_harvest) %>% 
+   mutate(n_remainings = n - p_harvest) %>% 
+   mutate(n_extract = pmin(n, p_harvest)) %>% 
+   select(site, biweek, n_extract))
+```
+
+What do we have (i.e. how many fish per biweek made it through genotypeing)? Make adjustments
+```{r sport_inside_mixture_n}
+(selection_JNU <- KSPORT18.gcl$attributes %>% 
+  filter(site == "JUNEAU") %>% 
+  count(site, biweek) %>% 
+  right_join(extraction_JNU, by = c("site", "biweek")) %>% 
+  replace_na(list(n = 0)) %>% 
+  mutate(diff = n - n_extract) %>% 
+  mutate(n_select = pmin(n, n_extract)))
+```
+
+Pick fish and create mixture.
+```{r sport_inside_mixture_create}
+ids_inside <- KSPORT18.gcl$attributes %>% 
+  filter(site == "JUNEAU") %>% 
+  nest(-biweek) %>% 
+  right_join(filter(selection_JNU, n_select > 0), by = "biweek") %>% 
+  mutate(sample = map2(data, n_select, sample_n)) %>% 
+  unnest(sample) %>% 
+  mutate(ids = as.character(FK_FISH_ID)) %>% 
+  pull(ids)
+
+ids_inside <- list("KSPORT18" = ids_inside)
+
+PoolCollections.GCL(collections = "KSPORT18", loci = GAPSLoci_reordered, IDs = ids_inside, newname = "InsideSport_2018")
+```
+
+Verify that we picked fish appropriately.
+```{r sport_inside_mixture_verify}
+InsideSport_2018.gcl$attributes %>% 
+  count(biweek)
+```
+
+Save genotypes for sport strata.
+```{r save_sport_inside_strata_genotypes}
+save_sillys(sillyvec = "InsideSport_2018", path = "../Genotypes/strata/")
+```
+
+### PBG/WRN
+
+What was the plan (i.e. ideal mixture sample size per biweek)?
+```{r sport_PBGWRN_mixture_ideal}
+# What does proportional sampling look like?
+(extraction_PBGWRN <- join_sport %>% 
+   filter(site %in% c("PETERSBURG", "WRANGELL")) %>% 
+   arrange(biweek) %>% 
+   mutate(p_harvest = round(harvest / sum(harvest) * 100)) %>%  # if we want 100 samples proportional to harvest by SW
+   mutate(n_sufficeint = n >= p_harvest) %>% 
+   mutate(n_remainings = n - p_harvest) %>% 
+   mutate(n_extract = pmin(n, p_harvest)) %>% 
+   select(site, biweek, n_extract))
+```
+
+What do we have (i.e. how many fish per biweek made it through genotypeing)? Make adjustments
+```{r sport_PBGWRN_mixture_n}
+(selection_PBGWRN <- KSPORT18.gcl$attributes %>% 
+  filter(site %in% c("PETERSBURG", "WRANGELL")) %>% 
+  count(site, biweek) %>% 
+  right_join(extraction_PBGWRN, by = c("site", "biweek")) %>% 
+  replace_na(list(n = 0)) %>% 
+  mutate(diff = n - n_extract) %>% 
+  mutate(n_select = pmin(n, n_extract)))
+```
+
+Pick fish and create mixture.
+```{r sport_PBGWRN_mixture_create}
+ids_PBGWRN <- KSPORT18.gcl$attributes %>% 
+  filter(site %in% c("PETERSBURG", "WRANGELL")) %>% 
+  nest(-site, -biweek) %>% 
+  right_join(filter(selection_PBGWRN, n_select > 0), by = c("site", "biweek")) %>% 
+  mutate(sample = map2(data, n_select, sample_n)) %>% 
+  unnest(sample) %>% 
+  mutate(ids = as.character(FK_FISH_ID)) %>% 
+  pull(ids)
+
+ids_PBGWRN <- list("KSPORT18" = ids_PBGWRN)
+
+PoolCollections.GCL(collections = "KSPORT18", loci = GAPSLoci_reordered, IDs = ids_PBGWRN, newname = "PBGWRNSport_2018")
+```
+
+Verify that we picked fish appropriately.
+```{r sport_PBGWRN_mixture_verify}
+PBGWRNSport_2018.gcl$attributes %>% 
+  count(site, biweek) %>% 
+  spread(site, n, fill = 0)
+```
+
+Save genotypes for sport strata.
+```{r save_sport_PBGWRN_strata_genotypes}
+save_sillys(sillyvec = "PBGWRNSport_2018", path = "../Genotypes/strata/")
+```
+
+### OutsidePer1
+
+What was the plan (i.e. ideal mixture sample size per biweek)?
+```{r sport_OutsidePer1_mixture_ideal}
+# What does proportional sampling look like?
+extraction_OutsidePer1 <- join_sport %>% 
+  filter(fishery == "Outside_early") %>% 
+  arrange(biweek) %>% 
+  mutate(p_harvest = round(harvest / sum(harvest) * 797)) %>%  # if we want 797 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= p_harvest) %>% 
+  mutate(n_remainings = n - p_harvest) %>% 
+  mutate(n_extract = pmin(n, p_harvest)) %>% 
+  select(site, biweek, n_extract)
+
+extraction_OutsidePer1 %>% 
+  spread(site, n_extract)
+```
+
+What do we have (i.e. how many fish per biweek made it through genotypeing)? Make adjustments
+```{r sport_OutsidePer1_mixture_n}
+(selection_OutsidePer1 <- KSPORT18.gcl$attributes %>% 
+  filter(fishery == "Outside_early") %>% 
+  count(site, biweek) %>% 
+  right_join(extraction_OutsidePer1, by = c("site", "biweek")) %>% 
+  replace_na(list(n = 0)) %>% 
+  mutate(diff = n - n_extract) %>% 
+  mutate(n_select = pmin(n, n_extract)))
+```
+
+Pick fish and create mixture.
+```{r sport_OutsidePer1_mixture_create}
+ids_OutsidePer1 <- KSPORT18.gcl$attributes %>% 
+  filter(fishery == "Outside_early") %>% 
+  nest(-site, -biweek) %>% 
+  right_join(filter(selection_OutsidePer1, n_select > 0), by = c("site", "biweek")) %>% 
+  mutate(sample = map2(data, n_select, sample_n)) %>% 
+  unnest(sample) %>% 
+  mutate(ids = as.character(FK_FISH_ID)) %>% 
+  pull(ids)
+
+ids_OutsidePer1 <- list("KSPORT18" = ids_OutsidePer1)
+
+PoolCollections.GCL(collections = "KSPORT18", loci = GAPSLoci_reordered, IDs = ids_OutsidePer1, newname = "OutsidePer1Sport_2018")
+```
+
+Verify that we picked fish appropriately.
+```{r sport_OutsidePer1_mixture_verify}
+OutsidePer1Sport_2018.gcl$attributes %>% 
+  count(site, biweek) %>% 
+  spread(site, n, fill = 0)
+```
+
+Save genotypes for sport strata.
+```{r save_sport_OutsidePer1_strata_genotypes}
+save_sillys(sillyvec = "OutsidePer1Sport_2018", path = "../Genotypes/strata/")
+```
+
+### OutsidePer2
+
+What was the plan (i.e. ideal mixture sample size per biweek)?
+```{r sport_OutsidePer2_mixture_ideal}
+# What does proportional sampling look like?
+extraction_OutsidePer2 <- join_sport %>% 
+  filter(fishery == "Outside_late") %>% 
+  arrange(biweek) %>% 
+  mutate(p_harvest = round(harvest / sum(harvest) * 555)) %>%  # if we want 555 samples proportional to harvest by SW
+  mutate(n_sufficeint = n >= p_harvest) %>% 
+  mutate(n_remainings = n - p_harvest) %>% 
+  mutate(n_extract = pmin(n, p_harvest)) %>% 
+  select(site, biweek, n_extract)
+
+extraction_OutsidePer2 %>% 
+  spread(site, n_extract)
+```
+
+What do we have (i.e. how many fish per biweek made it through genotypeing)? Make adjustments
+```{r sport_OutsidePer2_mixture_n}
+(selection_OutsidePer2 <- KSPORT18.gcl$attributes %>% 
+  filter(fishery == "Outside_late") %>% 
+  count(site, biweek) %>% 
+  right_join(extraction_OutsidePer2, by = c("site", "biweek")) %>% 
+  replace_na(list(n = 0)) %>% 
+  mutate(diff = n - n_extract) %>% 
+  mutate(n_select = pmin(n, n_extract)))
+```
+
+Pick fish and create mixture.
+```{r sport_OutsidePer2_mixture_create}
+ids_OutsidePer2 <- KSPORT18.gcl$attributes %>% 
+  filter(fishery == "Outside_late") %>% 
+  nest(-site, -biweek) %>% 
+  right_join(filter(selection_OutsidePer2, n_select > 0), by = c("site", "biweek")) %>% 
+  mutate(sample = map2(data, n_select, sample_n)) %>% 
+  unnest(sample) %>% 
+  mutate(ids = as.character(FK_FISH_ID)) %>% 
+  pull(ids)
+
+ids_OutsidePer2 <- list("KSPORT18" = ids_OutsidePer2)
+
+PoolCollections.GCL(collections = "KSPORT18", loci = GAPSLoci_reordered, IDs = ids_OutsidePer2, newname = "OutsidePer2Sport_2018")
+```
+
+Verify that we picked fish appropriately.
+```{r sport_OutsidePer2_mixture_verify}
+OutsidePer2Sport_2018.gcl$attributes %>% 
+  count(site, biweek) %>% 
+  spread(site, n, fill = 0)
+```
+
+Save genotypes for sport strata.
+```{r save_sport_OutsidePer2_strata_genotypes}
+save_sillys(sillyvec = "OutsidePer2Sport_2018", path = "../Genotypes/strata/")
+```
+
+# Data QA
+
+Standard data QA:
+
+  * Remove fish missing <80% genotypes
+  * Remove duplicates (>95% genotype concordance)
+
+```{r sport_mixnames}
+sport_2018_mixnames <- str_replace(string = dget("../../SEAK17/Objects/Sport_Mixtures.txt"), pattern = "2017", replacement = "2018")
+save_objects(objects = "sport_2018_mixnames", path = "../Objects/")
+```
+
+
+```{r sport_QA}
+# original sample sizes
+sport_2018_sample_sizes <- tibble(silly = sport_2018_mixnames,
+                                   genotyped = sapply(sport_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# missing
+sport_2018_missing <- RemoveIndMissLoci.GCL(sillyvec = sport_2018_mixnames, proportion = 0.8)
+save_objects("sport_2018_missing", "../Objects/")
+
+sport_2018_sample_sizes <- sport_2018_sample_sizes %>% 
+  mutate(missing = genotyped - sapply(sport_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# duplicate
+sport_2018_duplicates <- CheckDupWithinSilly.GCL(sillyvec = sport_2018_mixnames, loci = GAPSLoci_reordered, quantile = NULL, minproportion = 0.95)
+(sport_2018_duplicates_summary <- sapply(sport_2018_mixnames, function(x) {sport_2018_duplicates[[x]]$report}))
+save_objects("sport_2018_duplicates_summary", "../Objects/")
+
+sport_2018_duplciates_removed <- RemoveDups.GCL(dupcheck = sport_2018_duplicates)
+
+sport_2018_sample_sizes <- sport_2018_sample_sizes %>% 
+  mutate(duplicate = genotyped - missing - sapply(sport_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+
+# final
+sport_2018_sample_sizes <- sport_2018_sample_sizes %>% 
+  mutate(final = sapply(sport_2018_mixnames, function(x) {get(paste0(x, ".gcl"))$n }))
+sport_2018_sample_sizes
+save_objects("sport_2018_sample_sizes", "../Objects/")
+
+write_csv(sport_2018_sample_sizes, "../Tables/sport_2018_sample_sizes.csv")
+```
+
+Save post-QA genotypes
+```{r sport_post_QA}
+if(!dir.exists("../Genotypes/strata_postQA/")) {dir.create("../Genotypes/strata_postQA/")}
+save_sillys(sillyvec = sport_2018_mixnames, path = "../Genotypes/strata_postQA")
 ```

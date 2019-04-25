@@ -2127,3 +2127,99 @@ Save post-QA genotypes
 if(!dir.exists("../Genotypes/strata_postQA/")) {dir.create("../Genotypes/strata_postQA/")}
 save_sillys(sillyvec = sport_2018_mixnames, path = "../Genotypes/strata_postQA")
 ```
+# Create *BAYES* files
+
+## Directory setup
+
+First need to set up *BAYES* directory structure and copy over baseline file and *BAYES* objects. This was already done when we ran TBR.
+
+## Create mixtures
+
+Save the fortran format and create TBR *BAYES* mixture files. This was already done when we ran TBR.
+```{r sport_BAYES_mixtures}
+# mixfortran <- CreateMixture.GCL(sillys = TBR_sillys[1], loci = GAPSLoci_reordered, IDs = NULL, mixname = TBR_mixnames[TBR_sillys[1]], dir = "../BAYES/Mixture", type = "BAYES", PT = FALSE)
+# save_objects("mixfortran", "../Objects/")
+
+sapply(sport_2018_mixnames, function(mix) {
+  CreateMixture.GCL(sillys = mix, loci = GAPSLoci_reordered, IDs = NULL, mixname = mix, dir = "../BAYES/Mixture", type = "BAYES", PT = FALSE)
+} )
+```
+
+## Create priors
+
+New this year, I will be analyzing **ALL** Chinook mixtures with the full 33 reporting groups. Fortunately I had already re-summarized sport for 2017 at 33RG. 
+
+```{r sport_read_2017_estimates}
+SummerRet1_2013_33RG_EstimatesStats <- dget("../../SEAK17/Estimates objects/Sport_2017_33RG_EstimatesStats.txt")
+
+sport_2017_means_33RG <- sapply(c(SummerRet1_2013_33RG_EstimatesStats), function(mix) {
+  mix[, "mean"]
+} )
+
+dimnames(sport_2017_means_33RG)
+```
+
+Change column names for 2018 mixtures.
+```{r sport_setup_2018_priors}
+# Fix dimnames
+colnames(sport_2017_means_33RG) <- str_replace(string = colnames(sport_2017_means_33RG), pattern = "2017", replacement = "2018")
+
+# Verify
+apply(sport_2017_means_33RG, 2, sum)
+```
+
+Now create 2018 priors.
+```{r sport_create_2018_priors}
+sport_2018_priors <- apply(sport_2017_means_33RG, 2, function(mix) {
+  Prior.GCL(groupvec = GroupVec33RG_357, groupweights = mix, minval = 0.01)
+} )
+colnames(sport_2018_priors) <- sport_2018_mixnames
+save_objects("sport_2018_priors", "../Objects/")
+```
+
+## Create control files
+
+Now that we have priors, just need to create *BAYES* control files.
+```{r sport_BAYES_control}
+sapply(sport_2018_mixnames, function(mix) {
+  CreateControlFile.GCL(sillyvec = SEAKPops357, loci = GAPSLoci_reordered, mixname = mix, basename = "GAPS357pops13loci", suffix = "", nreps = 40000,
+                        nchains = 5, groupvec = GroupVec33RG_357, priorvec = sport_2018_priors[, mix], initmat = GAPS357PopsInits, 
+                        dir = "../BAYES/Control", seeds = WASSIPSockeyeSeeds, thin = c(1, 1, 100), mixfortran = mixfortran, 
+                        basefortran = bayesfortran_357, switches = "F T F T T T F")
+} )
+```
+
+## Create output directories
+
+```{r sport_BAYES_output}
+sapply(sport_2018_mixnames, function(mix) {dir.create(paste0("../BAYES/Output/", mix))} )
+```
+
+# Summarize *BAYES* results
+
+Summarize results for both the full 33 reporting groups, the 5 TBR groups, 3 TBR groups, and 2 TBR groups.
+
+## 33 reporting groups
+
+Create standard summary and save.
+```{r sport_BAYES_summarise_33RG}
+# full 33 reporting groups
+SummerRet1_2018_33RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output", mixvec = sport_2018_mixnames[1:4],
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+# dir.create("../Estimates objects")
+save_objects(c("SummerRet1_2018_33RG_EstimatesStats"), "../Estimates objects")
+```
+
+Check Gelman-Rubin
+```{r sport_GR_33RG}
+any(sapply(SummerRet1_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} ) > 1.2)
+sum(sapply(SummerRet1_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} ) > 1.2)
+sapply(SummerRet1_2018_33RG_EstimatesStats, function(mix) {mix[, "GR"]} )
+```
+
+Just Alsek in NO quadrant, estimate is super low, so no big deal.
+```{r}
+SummerRet1_2018_33RG_EstimatesStats[["SummerRet1NO_2018"]]["Alsek", ]
+```

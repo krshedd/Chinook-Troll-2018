@@ -2325,125 +2325,119 @@ write.table(x = moddat, file = "../ONCOR/Mixture/Troll2018.gen", quote = FALSE, 
 
 ### Sport scales
 
-Make a skinny version of sport attributes. Need post-QA version of `KSPORT18.gcl` that has ASL joined.
-```{r ONCOR_sport_attributes}
-(sport_ASL <- read_csv(file = "../ASL Data/_2018_SEAK_SF_Whatman_AWL_10OCT18.csv") %>% 
-   select(SITE, DATE, LENGTH, Whatman_Card, SAMPLE_NO, ScaleCardNumber, ScaleCardRow, Adipose_Clipped, TAGNUM, OTOLITH) %>% 
-   mutate(WGC = str_pad(Whatman_Card, 10, "left", "0")) %>% 
-   unite(fish_id, c("WGC", "SAMPLE_NO"), sep = "_", remove = FALSE))
-
-KSPORT18.gcl$attributes <- KSPORT18.gcl$attributes %>% 
-  unite(fish_id, c("DNA_TRAY_CODE", "DNA_TRAY_WELL_CODE"), sep = "_", remove = FALSE) %>% 
-  left_join(sport_ASL, by = "fish_id")
-
-
-str(KSPORT18.gcl$attributes)
-sport_attributes <- c("SillySource", "DATE", "SITE", "ScaleCardNumber", "ScaleCardRow", "Length", "TAGNUM", "OTOLITH")
-sport_attributes.df <- KSPORT17.gcl$attributes[, sport_attributes]
-str(sport_attributes.df)
+Need to match up ASL data with *ONCOR* output. This is a bit of a pain in the ass, because the *ONCOR* output is by SillySource, but ASL has WGC and Sample No. Will need to `attributes` table from KSPORT18.
+```{r ONCOR_sport_raw_output}
+rawsport <- scan(file = "../ONCOR/Output/sport2018_21RG_out.txt", what = '', sep = '\n', blank.lines.skip = FALSE)
+skip <- grep(pattern = "PROBABILITY OF EACH INDIVIDUAL IN THE MIXTURE BELONGING TO EACH REPORTING GROUP", x = rawsport) + 1
+(sport_dat <- read_delim(file = "../ONCOR/Output/sport2018_21RG_out.txt", delim = "\t", skip = skip, trim_ws = TRUE) %>% 
+    dplyr::rename(FishID = X1))
 ```
 
-```{r}
-
-## Read in Oncor output
-rawsport <- scan(file = "ONCOR/Output/Sport2017_21RG_out.txt", what = '', sep = '\n', blank.lines.skip = FALSE)
-skip = grep(pattern = "PROBABILITY OF EACH INDIVIDUAL IN THE MIXTURE BELONGING TO EACH REPORTING GROUP", x = rawsport) + 1
-dat <- read.table(file = "ONCOR/Output/Sport2017_21RG_out.txt", header = TRUE, skip = skip)
-str(dat)
-GroupNames21 <- colnames(dat)
-dput(x = GroupNames21, file = "Objects/GroupNames21.txt")
-
-## Base answer
-# x <- t(apply(data.matrix(dat), 1, function(ind) {
-#   c(GroupNames21[which.max(ind)], max(ind))
-# } ))
-
-## Tidy answer
-library(tidyverse)
-
-# Add FishID as factor
-dat.mod <- dat %>% 
-  mutate(FishID = factor(x = rownames(dat), levels = rownames(dat)))
-
+Get 1st and 2nd most likely probabilities for each FishID
+```{r sport_1st_2nd_probabilities}
 # 1st probability RG
-dat.tdy.1 <- dat.mod %>% 
+sport_dat_1 <- sport_dat %>% 
   gather(RG, prob, -FishID) %>% 
   group_by(FishID) %>% 
-  slice(which.max(prob))
-head(dat.tdy.1)
+  slice(which.max(prob)) %>% 
+  arrange(FishID)
 
 # 2nd probability RG
-dat.tdy.2 <- dat.mod %>% 
+sport_dat_2 <- sport_dat %>% 
   gather(RG, prob, -FishID) %>% 
   group_by(FishID) %>% 
   filter(rank(desc(prob)) == 2) %>% 
   arrange(FishID)
-head(dat.tdy.2)
+```
 
-# Join 1st and 2nd probability RG with sport attributes and filter for only outside caught fish (Sitka and Craig) that have an otolith number
-sport.dat.tdy <- left_join(x = dat.tdy.1, y = dat.tdy.2, by = "FishID") %>% 
-  rename(RG.1 = RG.x, prob.1 = prob.x, RG.2 = RG.y, prob.2 = prob.y) %>% 
-  filter(prob.1 >= 0.8) %>%
-  left_join(sport_attributes.df, by = c("FishID" = "SillySource")) %>% 
-  # filter(SITE %in% c("CRAIG_KLAWOCK", "SITKA")) %>%  # only filter for Craig and Sitka fish?
-  filter(OTOLIT != ".")  # filter for only fish with otolith number
-head(sport.dat.tdy)
-str(sport.dat.tdy, max.level = 1)
-dput(x = sport.dat.tdy, file = "Objects/sport.dat.tdy.txt")
+Join 1st and 2nd probability RG with sport attributes
+```{r sport_ONCOR_join_1st_2nd}
+sport_dat_tdy <- left_join(x = sport_dat_1, y = sport_dat_2, by = "FishID") %>% 
+  dplyr::rename(RG.1 = RG.x, prob.1 = prob.x, RG.2 = RG.y, prob.2 = prob.y) %>% 
+  filter(prob.1 >= 0.8)
+```
 
+Get sport WGC, see if duplicates.
+```{r sport_spring_summer_attributes, warning=FALSE}
+sport_dna_key <- KSPORT18.gcl$attributes %>% 
+  as_tibble() %>% 
+  unite(fish_id, c("DNA_TRAY_CODE", "DNA_TRAY_WELL_CODE"), sep = "_", remove = FALSE) %>% 
+  select(SillySource, fish_id)
 
-## Create individual sheets for different agencies
-sport_colnames <- c("IND", "Best Estimate", "Probability 1", "2nd Best Estimate", "Probability 2", "Date", "Port", "CardNo", "IndNo", "Length", "CWT", "Otolith")
+table(table(sport_dna_key$fish_id, useNA = "always"), useNA = "always")
+```
+
+Get sport ASL and join with `sport_dna_key`.
+```{r sport_ASL_ONCOR, message=FALSE, warning=FALSE}
+sport_ASL <- read_csv("../ASL Data/_2018_SEAK_SF_Whatman_AWL_06MAY19.csv") %>% 
+  select(SITE, DATE, LENGTH, Whatman_Card, SAMPLE_NO, ScaleCardNumber, ScaleCardRow, Adipose_Clipped, TAGNUM, otolithnumber) %>% 
+  mutate(WGC = str_pad(Whatman_Card, 10, "left", "0")) %>% 
+  unite(fish_id, c("WGC", "SAMPLE_NO"), sep = "_", remove = FALSE) %>% 
+  right_join(sport_dna_key)
+```
+
+Join *ONCOR* with ASL and verify all fish have ASL data.
+```{r sport_ONCOR_join_ALS}
+(sport_ONCOR_dat <- sport_dat_tdy %>% 
+   left_join(sport_ASL, by = c("FishID" = "SillySource")) %>% 
+   mutate(Date = dmy(DATE)) %>% 
+   dplyr::rename(IND = FishID, "Best Estimate" = RG.1, "Probability 1" = prob.1, "2nd Best Estimate" = RG.2, "Probability 2" = prob.2, "Port" = SITE, CardNo = ScaleCardNumber, IndNo = ScaleCardRow, Length = LENGTH, CWT = TAGNUM, AdClip = "Adipose_Clipped", Otolith = otolithnumber) %>% 
+   select(IND, `Best Estimate`, `Probability 1`, `2nd Best Estimate`, `Probability 2`, Date, Port, CardNo, IndNo, Length, CWT, AdClip, Otolith))
+
+sport_ONCOR_dat %>% filter(is.na(Port))
+```
+
+Save sport *ONCOR* results
+```{r sport_ONCOR_save}
+save_objects(objects = "sport_ONCOR_dat", path = "../Objects/")
 
 # Canada
-canada.sport.dat.tdy <- sport.dat.tdy %>% 
-  filter(RG.1 %in% c("FraserEarly", "NorCentBC", "WCVI")) %>% 
-  arrange(RG.1, desc(prob.1))
-colnames(canada.sport.dat.tdy) <- sport_colnames
-head(canada.sport.dat.tdy)
+sport_ONCOR_canada <- sport_ONCOR_dat %>% 
+  filter(`Best Estimate` %in% c("FraserEarly", "NorCentBC", "WCVI")) %>% 
+  arrange(`Best Estimate`, desc(`Probability 1`))
 
 # Washington
-washington.sport.dat.tdy <- sport.dat.tdy %>% 
-  filter(RG.1 %in% c("WACoast")) %>% 
-  arrange(RG.1, desc(prob.1))
-colnames(washington.sport.dat.tdy) <- sport_colnames
-head(washington.sport.dat.tdy)
+sport_ONCOR_washington <- sport_ONCOR_dat %>% 
+  filter(`Best Estimate` %in% c("WACoast")) %>% 
+  arrange(`Best Estimate`, desc(`Probability 1`))
 
 # Oregon
-oregon.sport.dat.tdy <- sport.dat.tdy %>% 
-  filter(RG.1 %in% c("NORCoast")) %>% 
-  arrange(RG.1, desc(prob.1))
-colnames(oregon.sport.dat.tdy) <- sport_colnames
-head(oregon.sport.dat.tdy)
+sport_ONCOR_oregon <- sport_ONCOR_dat %>% 
+  filter(`Best Estimate` %in% c("NORCoast")) %>% 
+  arrange(`Best Estimate`, desc(`Probability 1`))
 
 # Columbia
-columbia.sport.dat.tdy <- sport.dat.tdy %>% 
-  filter(RG.1 %in% c("IntColSuFa")) %>% 
-  arrange(RG.1, desc(prob.1))
-colnames(columbia.sport.dat.tdy) <- sport_colnames
-head(columbia.sport.dat.tdy)
+sport_ONCOR_columbia <- sport_ONCOR_dat %>% 
+  filter(`Best Estimate` %in% c("IntColSuFa")) %>% 
+  arrange(`Best Estimate`, desc(`Probability 1`))
 
 # Alaska
-alaska.sport.dat.tdy <- sport.dat.tdy %>% 
-  filter(RG.1 %in% c("SSEAK")) %>% 
-  arrange(RG.1, desc(prob.1))
-colnames(alaska.sport.dat.tdy) <- sport_colnames
-head(alaska.sport.dat.tdy)
-
+sport_ONCOR_alaska <- sport_ONCOR_dat %>% 
+  filter(`Best Estimate` %in% c("SSEAK")) %>% 
+  arrange(`Best Estimate`, desc(`Probability 1`))
 
 
 ## Write out data for Anne
-# dir.create("Origins")
-# write.csv(x = canada.sport.dat.tdy, file = "Origins/Sport_2017Scales_toread.csv", row.names = FALSE)
+if(!dir.exists("../Origins")) {dir.create("../Origins")}
 
-require(xlsx)
-write.xlsx(x = as.data.frame(canada.sport.dat.tdy), file = "Origins/Sport_2017Scales_toread.xlsx", sheetName = "Canada", row.names = FALSE, append = TRUE)
-write.xlsx(x = as.data.frame(washington.sport.dat.tdy), file = "Origins/Sport_2017Scales_toread.xlsx", sheetName = "Washington", row.names = FALSE, append = TRUE)
-write.xlsx(x = as.data.frame(oregon.sport.dat.tdy), file = "Origins/Sport_2017Scales_toread.xlsx", sheetName = "Oregon", row.names = FALSE, append = TRUE)
-write.xlsx(x = as.data.frame(columbia.sport.dat.tdy), file = "Origins/Sport_2017Scales_toread.xlsx", sheetName = "Columbia", row.names = FALSE, append = TRUE)
-write.xlsx(x = as.data.frame(alaska.sport.dat.tdy), file = "Origins/Sport_2017Scales_toread.xlsx", sheetName = "Alaska", row.names = FALSE, append = TRUE)
+require(writexl)
+sport_summary_list <- list("Canada" = sport_ONCOR_canada,
+                           "Washington" = sport_ONCOR_washington,
+                           "Oregon" = sport_ONCOR_oregon,
+                           "Columbia" = sport_ONCOR_columbia,
+                           "Alaska" = sport_ONCOR_alaska)
+
+writexl::write_xlsx(x = sport_summary_list, path = "../Origins/Sport_2018_Scales_toread.xlsx", col_names = TRUE)
 ```
 
+### Sport otoliths
+
+Need a separate sheet with just WCVI fish to send to MTA Lab for otolith reading.
+```{r sport_origins_WCVI_otoliths}
+sport_ONCOR_canada %>% 
+  filter(`Best Estimate` == "WCVI") %>% 
+  write_csv(path = "../Origins/Sport_2018_Otoliths_WCVI_toread.csv")
+```
 
 ### Troll scales
 

@@ -2435,7 +2435,7 @@ writexl::write_xlsx(x = sport_summary_list, path = "../Origins/Sport_2018_Scales
 Need a separate sheet with just WCVI fish to send to MTA Lab for otolith reading.
 ```{r sport_origins_WCVI_otoliths}
 sport_ONCOR_canada %>% 
-  filter(`Best Estimate` == "WCVI") %>% 
+  filter(`Best Estimate` == "WCVI" & Port %in% c("SITKA", "CRAIG_KLAWOCK") & Otolith != ".") %>% 
   write_csv(path = "../Origins/Sport_2018_Otoliths_WCVI_toread.csv")
 ```
 

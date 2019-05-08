@@ -3132,3 +3132,80 @@ sport_AY_2009_2018_8RG_estimates.tdy <-
 
 save_objects(c("sport_AY_2009_2018_8RG_estimates.tdy"), "../Estimates objects")
 ```
+
+Plot
+```{r}
+sport_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  ggplot(aes(x = year, y = mean * 100, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock Composition (%)") +
+  xlab("Year") +
+  ggtitle("SEAK Sport Harvest by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
+```
+
+Get harvest
+```{r}
+sport_harvest_AY_2008_2017 <- read_csv("../Harvest Data/swhs_est_20190508150526.csv", skip = 2) %>% 
+  gather(year, harvest, -SOUTHEAST)
+
+
+(annual_sport_harvest_AY_2009_2018 <- sport_harvest_AY_2008_2017 %>% 
+    filter(year >= 2009 & year <= 2017 & SOUTHEAST == "Southeast Total") %>% 
+    select(year, harvest) %>% 
+    bind_rows(tibble(year = "2018", harvest = sum(sport_harvest$harvest))))
+```
+
+Stock-specific harvest
+```{r}
+sport_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  left_join(annual_sport_harvest_AY_2009_2018, by = "year") %>% 
+  ggplot(aes(x = year, y = mean * harvest / 1000, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  # scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock-Specific Harvest (1,000's)") +
+  xlab("Year") +
+  ggtitle("SEAK Sport Harvest by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
+```
+
+
+# Compare Sport vs. Troll stock-specific harvest
+```{r}
+sport_AY_2009_2018_8RG_estimates_harvest <- sport_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  left_join(annual_sport_harvest_AY_2009_2018, by = "year") %>% 
+  mutate(fishery = "Sport")
+
+troll_AY_2009_2018_8RG_estimates_harvest <- troll_AY_2009_2018_8RG_estimates.tdy %>% 
+  left_join(annual_troll_harvest_AY_2009_2018, by = c("year" = "AY")) %>% 
+  mutate(year = as.character(year)) %>% 
+  rename(harvest = Harvest) %>% 
+  mutate(fishery = "Troll")
+
+bind_rows(sport_AY_2009_2018_8RG_estimates_harvest, troll_AY_2009_2018_8RG_estimates_harvest) %>% 
+  ggplot(aes(x = year, y = mean * harvest / 1000, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  # scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock-Specific Harvest (1,000's)") +
+  xlab("Year") +
+  ggtitle("SEAK Troll Harvest by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14), axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  facet_grid(. ~ fishery)
+```
+

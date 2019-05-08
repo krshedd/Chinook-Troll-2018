@@ -2619,7 +2619,7 @@ save_objects(objects = objects(pattern = "Troll_2018_Mixtures"), path = "../Esti
 ## Stratified
 
 Read in harvest data.
-```{r}
+```{r troll_harvest_by_quad}
 troll_harvest <- bind_rows(
   read_csv("../Harvest Data/ft - Detailed Fish Tickets_traditional.csv"),
   read_csv("../Harvest Data/ft - Detailed Fish Tickets_spring.csv")) %>% 
@@ -2649,7 +2649,7 @@ troll_harvest %>%
 
 ### Early Winter
 
-```{r}
+```{r troll_EW_stratified}
 EWint_2018_33RG_StratifiedEstimatesStats <- 
   StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = winter_2018_mixnames[1:4], 
                           catchvec = c(4501, 86, 1262, 1549), newname = "EWintAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
@@ -2671,7 +2671,7 @@ save_objects(objects = objects(pattern = "EWint_2018_"), path = "../Estimates ob
 
 ### Late Winter
 
-```{r}
+```{r troll_LW_stratified}
 LWint_2018_33RG_StratifiedEstimatesStats <- 
   StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = winter_2018_mixnames[5:8], 
                           catchvec = c(1664, 362, 903, 1640), newname = "LWintAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
@@ -2693,7 +2693,7 @@ save_objects(objects = objects(pattern = "LWint_2018_"), path = "../Estimates ob
 
 ### Summer Ret 1
 
-```{r}
+```{r troll_SU1_stratified}
 SummerRet1_2018_33RG_StratifiedEstimatesStats <- 
   StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = summer_2018_mixnames[c(2,4,1,3)], 
                           catchvec = c(38087, 14219, 2797, 3993), newname = "SummerRet1AllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
@@ -2715,7 +2715,7 @@ save_objects(objects = objects(pattern = "SummerRet1_2018_"), path = "../Estimat
 
 ### Summer Ret 2
 
-```{r}
+```{r troll_SU2_stratified}
 SummerRet2_2018_33RG_StratifiedEstimatesStats <- 
   StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = summer_2018_mixnames[c(6,8,5,7)], 
                           catchvec = c(16907, 8649, 454, 1736), newname = "SummerRet2AllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
@@ -2735,6 +2735,400 @@ SummerRet2_2018_4RG_StratifiedEstimatesStats <-
 save_objects(objects = objects(pattern = "SummerRet2_2018_"), path = "../Estimates objects/")
 ```
 
+### Spring
+
+#### Ret 1 (May)
+
+Verify harvest by stat area for May.
+```{r troll_SP1_stratified_harvest}
+troll_harvest %>% 
+  filter(Fishery == "Spring Ret 1") %>% 
+  group_by(`Stat Area`) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE))
+```
+
+What mixutres did we run?
+```{r troll_SP1_mixtures}
+spring_2018_mixnames
+```
+
+Well shit, I forgot that we ran some stat areas as May + June. Also, from looking at some of the stat areas that we ran separately for May and June, there is a LOT of temporal variation (WCVI decreases, Andrew increases). This means that we probably should not use the May + June strata to represent just May, same goes for June.
+
+#### Ret 2 (June)
+
+Not planning to estimate this stratified mixture given that we don't have fine-scale enough mixtures (some stat areas are May + June and there is too much temporal variation to use the season total).
+
+#### NO Quad (171)
+
+All harvest from NO quadrant May + June.
+```{r troll_SP_NO_quad_stratified_harvest}
+troll_harvest %>% 
+  filter(Fishery %in% c("Spring Ret 1", "Spring Ret 2") & Quadrant == 171) %>% 
+  group_by(`Stat Area`, Fishery) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE)) %>% 
+  spread(Fishery, Harvest, fill = 0)
+```
+
+Have to use some mixtures to represent other "un-genotyped" mixtures. Did so based on time and area (i.e. 113-32 June harvest ~ 113-01 June harvest, not 113-30 harvest because temporal variation was so strong; use 113-41 May for 113-62 May instead of 113-62 June).
+```{r troll_SP_NO_quad_stratified}
+SpringNO_2018_33RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(8,1,8,5,9,5,10,2)], 
+                          catchvec = c(498, 236, 67, 497, 1230, 52, 892, 190), newname = "SpringNOAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringNO_2018_18RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to18RG, groupnames = GroupNames18, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(8,1,8,5,9,5,10,2)], 
+                          catchvec = c(498, 236, 67, 497, 1230, 52, 892, 190), newname = "SpringNOAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringNO_2018_8RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to8RG, groupnames = GroupNames8, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(8,1,8,5,9,5,10,2)], 
+                          catchvec = c(498, 236, 67, 497, 1230, 52, 892, 190), newname = "SpringNOAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringNO_2018_4RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to4RG, groupnames = GroupNames4, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(8,1,8,5,9,5,10,2)], 
+                          catchvec = c(498, 236, 67, 497, 1230, 52, 892, 190), newname = "SpringNOAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+save_objects(objects = objects(pattern = "SpringNO_2018_"), path = "../Estimates objects/")
+```
+
+#### SO Quad (172)
+
+All harvest from SO quadrant May + June.
+```{r troll_SP_SO_quad_stratified_harvest}
+troll_harvest %>% 
+  filter(Fishery %in% c("Spring Ret 1", "Spring Ret 2") & Quadrant == 172) %>% 
+  group_by(`Stat Area`, Fishery) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE)) %>% 
+  spread(Fishery, Harvest, fill = 0)
+```
+
+This is very straightforward as 103-50 is the only stat area fished in SO quad (172)
+```{r troll_SP_SO_quad_stratified}
+SpringSO_2018_33RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(4,7)], 
+                          catchvec = c(424, 281), newname = "SpringSOAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringSO_2018_18RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to18RG, groupnames = GroupNames18, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(4,7)], 
+                          catchvec = c(424, 281), newname = "SpringSOAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringSO_2018_8RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to8RG, groupnames = GroupNames8, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(4,7)], 
+                          catchvec = c(424, 281), newname = "SpringSOAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringSO_2018_4RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to4RG, groupnames = GroupNames4, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(4,7)], 
+                          catchvec = c(424, 281), newname = "SpringSOAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+save_objects(objects = objects(pattern = "SpringSO_2018_"), path = "../Estimates objects/")
+```
+
+#### SI Quad (174)
+
+All harvest from SI quadrant May + June.
+```{r troll_SP_SI_quad_stratified_harvest}
+troll_harvest %>% 
+  filter(Fishery %in% c("Spring Ret 1", "Spring Ret 2") & Quadrant == 174) %>% 
+  group_by(`Stat Area`, Fishery) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE)) %>% 
+  spread(Fishery, Harvest, fill = 0)
+```
+
+This is very straightforward as 101-45 is the only stat area fished in SI quad (174)
+```{r troll_SP_SI_quad_stratified}
+SpringSI_2018_33RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(3,6)], 
+                          catchvec = c(289, 2306), newname = "SpringSIAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringSI_2018_18RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to18RG, groupnames = GroupNames18, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(3,6)], 
+                          catchvec = c(289, 2306), newname = "SpringSIAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringSI_2018_8RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to8RG, groupnames = GroupNames8, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(3,6)], 
+                          catchvec = c(289, 2306), newname = "SpringSIAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+SpringSI_2018_4RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to4RG, groupnames = GroupNames4, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(3,6)], 
+                          catchvec = c(289, 2306), newname = "SpringSIAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+save_objects(objects = objects(pattern = "SpringSI_2018_"), path = "../Estimates objects/")
+```
+
+#### Spring All Quads
+
+All harvest from all quadrants May + June.
+```{r troll_SP_stratified_harvest}
+troll_harvest %>% 
+  filter(Fishery %in% c("Spring Ret 1", "Spring Ret 2")) %>% 
+  group_by(`Stat Area`, Fishery) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE)) %>% 
+  spread(Fishery, Harvest, fill = 0)
+```
+
+Have to use some mixtures to represent other "un-genotyped" mixtures. Did so based on time and area (i.e. 113-32 June harvest ~ 113-01 June harvest, not 113-30 harvest because temporal variation was so strong; use 113-41 May for 113-62 May instead of 113-62 June).
+```{r troll_SP_stratified}
+Spring_2018_33RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(3,6,4,7,8,1,8,5,9,5,10,2)], 
+                          catchvec = c(289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190), newname = "SpringAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+Spring_2018_18RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to18RG, groupnames = GroupNames18, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(3,6,4,7,8,1,8,5,9,5,10,2)], 
+                          catchvec = c(289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190), newname = "SpringAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+Spring_2018_8RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to8RG, groupnames = GroupNames8, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(3,6,4,7,8,1,8,5,9,5,10,2)], 
+                          catchvec = c(289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190), newname = "SpringAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+Spring_2018_4RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to4RG, groupnames = GroupNames4, maindir = "../BAYES/Output/", mixvec = spring_2018_mixnames[c(3,6,4,7,8,1,8,5,9,5,10,2)], 
+                          catchvec = c(289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190), newname = "SpringAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+save_objects(objects = objects(pattern = "Spring_2018_"), path = "../Estimates objects/")
+```
+
 ## All year, publication tables
 
 ## All year, stratified
+
+Full Accounting Year troll harvest. Note that Winter and Summer are by period and quadrant, but Spring is by month and stat area.
+```{r troll_winter_summer_harvest_table}
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+troll_harvest %>% 
+  filter(Fishery %!in% c("Spring Ret 1", "Spring Ret 2")) %>% 
+  group_by(Quadrant, Fishery) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE)) %>% 
+  spread(Fishery, Harvest, fill = 0)
+```
+
+```{r troll_spring_harvest_table}
+troll_harvest %>% 
+  filter(Fishery %in% c("Spring Ret 1", "Spring Ret 2")) %>% 
+  group_by(`Stat Area`, Fishery) %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE)) %>% 
+  spread(Fishery, Harvest, fill = 0)
+```
+
+Verify that all harvest is accounted for in `catchvec`.
+```{r troll_AY_harvest_verify}
+troll_harvest %>% 
+  summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE)) %>% 
+  pull(Harvest)
+
+sum(c(4501, 86, 1262, 1549, 1664, 362, 903, 1640, 289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190, 38087, 14219, 2797, 3993, 16907, 8649, 454, 1736))
+```
+
+Full AY stratified estimate
+```{r troll_all_year_all_quad_stratified}
+AllYearTroll2018_33RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = c(winter_2018_mixnames, spring_2018_mixnames[c(3,6,4,7,8,1,8,5,9,5,10,2)], summer_2018_mixnames[c(2,4,1,3,6,8,5,7)]), 
+                          catchvec = c(4501, 86, 1262, 1549, 1664, 362, 903, 1640, 289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190, 38087, 14219, 2797, 3993, 16907, 8649, 454, 1736), newname = "AllYearAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+AllYearTroll2018_18RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to18RG, groupnames = GroupNames18, maindir = "../BAYES/Output/", mixvec = c(winter_2018_mixnames, spring_2018_mixnames[c(3,6,4,7,8,1,8,5,9,5,10,2)], summer_2018_mixnames[c(2,4,1,3,6,8,5,7)]), 
+                          catchvec = c(4501, 86, 1262, 1549, 1664, 362, 903, 1640, 289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190, 38087, 14219, 2797, 3993, 16907, 8649, 454, 1736), newname = "AllYearAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+AllYearTroll2018_8RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to8RG, groupnames = GroupNames8, maindir = "../BAYES/Output/", mixvec = c(winter_2018_mixnames, spring_2018_mixnames[c(3,6,4,7,8,1,8,5,9,5,10,2)], summer_2018_mixnames[c(2,4,1,3,6,8,5,7)]), 
+                          catchvec = c(4501, 86, 1262, 1549, 1664, 362, 903, 1640, 289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190, 38087, 14219, 2797, 3993, 16907, 8649, 454, 1736), newname = "AllYearAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+AllYearTroll2018_4RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to4RG, groupnames = GroupNames4, maindir = "../BAYES/Output/", mixvec = c(winter_2018_mixnames, spring_2018_mixnames[c(3,6,4,7,8,1,8,5,9,5,10,2)], summer_2018_mixnames[c(2,4,1,3,6,8,5,7)]), 
+                          catchvec = c(4501, 86, 1262, 1549, 1664, 362, 903, 1640, 289, 2306, 424, 281, 498, 236, 67, 497, 1230, 52, 892, 190, 38087, 14219, 2797, 3993, 16907, 8649, 454, 1736), newname = "AllYearAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+save_objects(objects = objects(pattern = "AllYearTroll2018_"), path = "../Estimates objects/")
+```
+
+# Sport resummarization
+
+## All sport, all RGs
+
+```{r sport_mixtures}
+Sport_2018_Mixtures_33RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output", mixvec = sport_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+Sport_2018_Mixtures_18RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = GroupVec33RG_to18RG, groupnames = GroupNames18, maindir = "../BAYES/Output", mixvec = sport_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+Sport_2018_Mixtures_8RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = GroupVec33RG_to8RG, groupnames = GroupNames8, maindir = "../BAYES/Output", mixvec = sport_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+Sport_2018_Mixtures_4RG_EstimatesStats <- 
+  CustomCombineBAYESOutput.GCL(groupvec = GroupVec33RG_to4RG, groupnames = GroupNames4, maindir = "../BAYES/Output", mixvec = sport_2018_mixnames,
+                               prior = "", ext = "RGN", nchains = 5, burn = 0.5, alpha = 0.1, PosteriorOutput = FALSE)
+
+save_objects(objects = "sport_2018_mixnames", path = "../Objects/")
+save_objects(objects = objects(pattern = "Sport_2018_Mixtures"), path = "../Estimates objects/")
+```
+
+## All year, stratified
+
+Full Accounting Year sport harvest.
+```{r sport_harvest_table}
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+sport_harvest <- read_csv("../Harvest Data/preliminary_2018_sport_harvest_chinook.csv") %>% 
+  gather(port, harvest, -biweek) %>% 
+  mutate(period = case_when(biweek <= 13 ~ "early",
+                            biweek > 13 ~ "late")) %>% 
+  mutate(fishery = case_when(port == "Ketchikan" ~ "Ketchikan",
+                             port %in% c("Petersburg", "Wrangell") ~ "PBG/WRN",
+                             port == "Juneau" ~ "Inside",
+                             TRUE ~ "Outside"))
+
+sport_harvest %>% 
+  group_by(fishery, period) %>% 
+  summarise(harvest = sum(harvest)) %>% 
+  spread(fishery, harvest, fill = 0)
+```
+
+Full AY stratified estimate
+```{r sport_all_year_all_quad_stratified}
+AllYearSport2018_33RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = 1:33, groupnames = GroupNames33, maindir = "../BAYES/Output/", mixvec = sport_2018_mixnames[-c(1:2)], 
+                          catchvec = c(5312, 889, 2618, 9328, 6475), newname = "AllYearAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+AllYearSport2018_18RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to18RG, groupnames = GroupNames18, maindir = "../BAYES/Output/", mixvec = sport_2018_mixnames[-c(1:2)], 
+                          catchvec = c(5312, 889, 2618, 9328, 6475), newname = "AllYearAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+AllYearSport2018_8RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to8RG, groupnames = GroupNames8, maindir = "../BAYES/Output/", mixvec = sport_2018_mixnames[-c(1:2)], 
+                          catchvec = c(5312, 889, 2618, 9328, 6475), newname = "AllYearAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+AllYearSport2018_4RG_StratifiedEstimatesStats <- 
+  StratifiedEstimator.GCL(groupvec = GroupVec33RG_to4RG, groupnames = GroupNames4, maindir = "../BAYES/Output/", mixvec = sport_2018_mixnames[-c(1:2)], 
+                          catchvec = c(5312, 889, 2618, 9328, 6475), newname = "AllYearAllQuad", ext = "RGN", nchains = 5, xlxs = FALSE, PosteriorOutput = FALSE)
+
+save_objects(objects = objects(pattern = "AllYearSport2018_"), path = "../Estimates objects/")
+```
+
+# Compare All Year Troll AY 2009-2018
+
+Get all year stock comp for AY 2009-2018
+```{r troll_all_year_all_quad_2009-2018_8RG}
+AllYearTroll2009_2018_8RG_StratifiedEstimatesStats <- 
+  c(dget("../../SEAK15/Estimates objects/AllYearTroll2009_2015_8RG_StratifiedEstimatesStats.txt"),
+    list(`2016` = dget("../../SEAK16/Estimates objects/AllYearTroll2016_8RG_StratifiedEstimatesStats.txt")),
+    list(`2017` = dget("../../SEAK17/Estimates objects/AllYearTroll2017_8RG_StratifiedEstimatesStats.txt")),
+    list(`2018` = dget("../../SEAK18/Estimates objects/AllYearTroll2018_8RG_StratifiedEstimatesStats.txt")))
+
+save_objects("AllYearTroll2009_2018_8RG_StratifiedEstimatesStats", "../Estimates objects/")
+```
+
+Make in to tibble
+```{r troll_all_year_all_quad_2009-2018_8RG_tibble}
+# make in to a tidy tibble (tall)
+troll_AY_2009_2018_8RG_estimates.tdy <- 
+  bind_rows(
+    sapply(as.character(2009:2018), function(yr) {
+      AllYearTroll2009_2018_8RG_StratifiedEstimatesStats[[yr]] %>% 
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(year = as.integer(yr)) %>% # make column for year
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    }, simplify = FALSE)
+  ) %>% 
+  # gather(estimator, value, -year, -group, - n_group) %>%  # gather all estimators
+  # mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames8))  # factor for ordering
+
+save_objects(c("troll_AY_2009_2018_8RG_estimates.tdy"), "../Estimates objects")
+```
+
+Plot
+```{r}
+troll_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  ggplot(aes(x = year, y = mean * 100, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock Composition (%)") +
+  xlab("Year") +
+  ggtitle("SEAK Troll Harvest by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
+```
+
+Get harvest
+```{r}
+troll_harvest_AY_2009_2018 <- read_csv("../Harvest Data/CE008113.csv", skip = 22) %>% 
+  mutate(Quadrant = case_when(`Area Value` == "NE" ~ "NI",
+                              `Area Value` == "NW" ~ "NO",
+                              `Area Value` == "SE" ~ "SI",
+                              `Area Value` == "SW" ~ "SO")) %>% 
+  mutate(District = case_when(Quadrant == "NO" ~ 171,
+                              Quadrant == "SO" ~ 172,
+                              Quadrant == "NI" ~ 173,
+                              Quadrant == "SI" ~ 174)) %>% 
+  mutate(Fishery = case_when(`Time Value` == 6 ~ "Early Winter",
+                             `Time Value` == 1 ~ "Late Winter",
+                             `Time Value` == 2 ~ "Spring Ret 1",
+                             `Time Value` == 3 ~ "Spring Ret 2",
+                             `Time Value` == 4 ~ "Summer Ret 1",
+                             `Time Value` == 5 ~ "Summer Ret 2")) %>% 
+  mutate(Fishery = factor(Fishery, c("Early Winter", "Late Winter", "Spring Ret 1", "Spring Ret 2", "Summer Ret 1", "Summer Ret 2"))) %>% 
+  mutate(AY = case_when(Fishery == "Early Winter" ~ Year + 1,
+                        TRUE ~ Year)) %>% 
+  filter(AY >= 2009 & AY < 2019) %>% 
+  select(AY, Year, Fishery, Quadrant, District, `N Catch`) %>% 
+  rename(Harvest = `N Catch`)
+
+(annual_troll_harvest_AY_2009_2018 <- troll_harvest_AY_2009_2018 %>% 
+    group_by(AY) %>% 
+    summarise(Harvest = sum(Harvest)))
+```
+
+Stock-specific harvest
+```{r}
+troll_AY_2009_2018_8RG_estimates.tdy %>% 
+  left_join(annual_troll_harvest_AY_2009_2018, by = c("year" = "AY")) %>% 
+  mutate(year = as.character(year)) %>% 
+  ggplot(aes(x = year, y = mean * Harvest / 1000, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  # scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock-Specific Harvest (1,000's)") +
+  xlab("Year") +
+  ggtitle("SEAK Troll Harvest by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
+```
+
+# Compare All Year Sport AY 2009-2018
+
+Get all year stock comp for AY 2009-2018
+```{r sport_all_year_all_quad_2009-2018_8RG}
+AllYearSport2009_2018_8RG_StratifiedEstimatesStats <- 
+  c(dget("../../SEAK16/Estimates objects/AllYearSport2009_2016_8RG_StratifiedEstimatesStats.txt"),
+    list(`2017` = dget("../../SEAK17/Estimates objects/AllYearSport2017_8RG_StratifiedEstimatesStats.txt")),
+    list(`2018` = dget("../../SEAK18/Estimates objects/AllYearSport2018_8RG_StratifiedEstimatesStats.txt")))
+
+save_objects("AllYearSport2009_2018_8RG_StratifiedEstimatesStats", "../Estimates objects/")
+```
+
+Make in to tibble
+```{r sport_all_year_all_quad_2009-2018_8RG_tibble}
+# make in to a tidy tibble (tall)
+sport_AY_2009_2018_8RG_estimates.tdy <- 
+  bind_rows(
+    sapply(as.character(2009:2018), function(yr) {
+      AllYearSport2009_2018_8RG_StratifiedEstimatesStats[[yr]] %>% 
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(year = as.integer(yr)) %>% # make column for year
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    }, simplify = FALSE)
+  ) %>% 
+  # gather(estimator, value, -year, -group, - n_group) %>%  # gather all estimators
+  # mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames8))  # factor for ordering
+
+save_objects(c("sport_AY_2009_2018_8RG_estimates.tdy"), "../Estimates objects")
+```

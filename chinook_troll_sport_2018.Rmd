@@ -3203,9 +3203,44 @@ bind_rows(sport_AY_2009_2018_8RG_estimates_harvest, troll_AY_2009_2018_8RG_estim
   # scale_y_continuous(breaks = seq(0, 100, 20)) +
   ylab("Stock-Specific Harvest (1,000's)") +
   xlab("Year") +
-  ggtitle("SEAK Troll Harvest by AY") +
+  ggtitle("SEAK Harvest by AY and Fishery") +
   theme_classic() +
   theme(text = element_text(size = 14), axis.text.x = element_text(angle = 90, vjust = 0.5)) +
   facet_grid(. ~ fishery)
+```
+
+# Compare Sport vs. Troll stock composition
+```{r}
+sport_AY_2009_2018_8RG_estimates <- sport_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  mutate(fishery = "Sport")
+
+troll_AY_2009_2018_8RG_estimates <- troll_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  mutate(fishery = "Troll")
+
+bind_rows(sport_AY_2009_2018_8RG_estimates, troll_AY_2009_2018_8RG_estimates) %>% 
+  ggplot(aes(x = year, y = mean * 100, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  # scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock Composition (%)") +
+  xlab("Year") +
+  ggtitle("SEAK Stock Composition by AY and Fishery") +
+  theme_classic() +
+  theme(text = element_text(size = 14), axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  facet_grid(. ~ fishery)
+```
+
+# Make Annual Tables
+
+For Dani's briefing paper
+```{r annual_summaries}
+write_csv(x = troll_AY_2009_2018_8RG_estimates.tdy, path = "../Tables/troll_AY_2009_2018_8RG_annual_estimates.csv")
+write_csv(x = sport_AY_2009_2018_8RG_estimates.tdy, path = "../Tables/sport_AY_2009_2018_8RG_annual_estimates.csv")
+write_csv(x = annual_sport_harvest_AY_2009_2018, path = "../Tables/annual_sport_harvest_AY_2009_2018.csv")
+write_csv(x = annual_troll_harvest_AY_2009_2018, path = "../Tables/annual_troll_harvest_AY_2009_2018.csv")
 ```
 

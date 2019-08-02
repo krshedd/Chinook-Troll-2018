@@ -17,7 +17,7 @@ load_objects("../Objects/")
 load_objects("../Estimates objects/")
 ```
 
-# Summer Troll
+# Summer Troll - AY 2018
 
 ## Harvest
 
@@ -35,7 +35,7 @@ load_objects("../Estimates objects/")
                              District %in% c(103, 104, 152) ~ 172,
                              District %in% c(109, 110, 111, 112, 115) ~ 173,
                              District %in% c(101, 102, 105, 106, 107, 108) ~ 174)) %>% 
-  filter(Year == 2018 & Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>% 
+  filter(Year == 2018 & Fishery %in% c("Summer Ret 1", "Summer Ret 2")) %>%
   group_by(Quadrant, Fishery) %>% 
   summarise(Harvest = sum(`Number Of Animals (sum)`, na.rm = TRUE)) %>% 
   spread(Fishery, Harvest, fill = 0))
@@ -43,90 +43,36 @@ load_objects("../Estimates objects/")
 
 ## Sample sizes
 
-Final samples sizes for all Quadrant x Period. The original plan was to run ~200 fish for Late Winter NO, NI, and SI, however, I had to subsampled down in order to get the samples analyzed proportional to harvest by stat week.
-```{r winter_n}
+Final samples sizes for all Quadrant x Period. The original plan from our Northern Fund proposal was to run 1,500 fish total for Summer troll (1st and 2nd retention combined), however, we used some of those fish to look at spring troll in finer detail. The revised plan was to look at ~380 fish from Summer 1 NO, ~220 for Summer 1 SO and Summer 2 NO, ~120 for Summer 2 SO, and then 50 each for remaining quadrant x period. In order to get full period estimates, stock compositions for each quadrant were stratified by quadrant-specific harvest.
+```{r summer_n}
 summer_2018_sample_sizes %>% 
   separate(silly, into = c("Fishery", "Year"), sep = "_") %>% 
   select(Fishery, genotyped, missing, duplicate, final)
 ```
 
 ## Stock composition
+
 For each Quadrant and Period there will be a table showing stock composition results for all major stocks (i.e. those contributing > 5% to harvest).  
-**Note** Late Winter NO, NI, and SI did not have as many samples run as planned (see above), thus we will need to discuss how many reporting groups we ultimately include. Take the results presented here with a grain of salt.
 
-### Early Winter - Northern Outside (171)
-What are the major stocks contributing to these mixtures (mean > 5%)?
-```{r winter_stock_comp_table_EWintNO}
-winter_2018_33RG_estimates.tdy %>% 
-  mutate(value = value * 100) %>% 
-  spread(estimator, value) %>% 
-  filter(mean > 5 & fishery == "EWint" & quadrant == "NO") %>% 
-  mutate_if(is.numeric, round, 1) %>% 
-  arrange(quadrant, fishery, desc(mean)) %>% 
-  select(fishery, quadrant, group, mean, sd, `5%`, `95%`)
-```
+### Summer Retention 1 - Northern Outside (171), Southern Outside (172)
 
-```{r winter_troll_figures_EWintNO, out.width="100%"}
-winter_2018_33RG_estimates.tdy %>% 
-  spread(estimator, value) %>% 
-  filter(fishery == "EWint" & quadrant == "NO") %>% 
-  ggplot(aes(x = group, y = mean * 100)) +
-  geom_col(fill = "lightblue") +
-  geom_errorbar(aes(ymin = `5%` * 100, ymax = `95%` * 100)) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3)) +
-  ylim(0, 100) +
-  ylab("Stock Composition (%)") +
-  xlab("Reporting Group") +
-  ggtitle("Early Winter Troll AY 2018: Northern Outside 171")
-```
-
-### Early Winter - All Quadrants
-What are the major stocks contributing to these mixtures (mean > 5%)?
-```{r winter_stock_comp_table_EWintAllQuad}
-winter_2018_33RG_stratified_estimates.tdy %>% 
-  mutate(value = value * 100) %>% 
-  spread(estimator, value) %>% 
-  filter(mean > 5 & fishery == "EWint") %>% 
-  mutate_if(is.numeric, round, 1) %>% 
-  arrange(quadrant, fishery, desc(mean)) %>% 
-  select(fishery, quadrant, group, mean, sd, `5%`, `95%`)
-```
-
-```{r winter_troll_figures_EWintAllQuad, out.width="100%"}
-winter_2018_33RG_stratified_estimates.tdy %>% 
-  spread(estimator, value) %>% 
-  filter(fishery == "EWint") %>% 
-  ggplot(aes(x = group, y = mean * 100)) +
-  geom_col(fill = "lightblue") +
-  geom_errorbar(aes(ymin = `5%` * 100, ymax = `95%` * 100)) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3)) +
-  ylim(0, 100) +
-  ylab("Stock Composition (%)") +
-  xlab("Reporting Group") +
-  ggtitle("Early Winter Troll AY 2018: All Quad")
-```
-
-### Late Winter - Northern Outside (171), Northern Inside (173), and Southern Inside (174)
 What are the major stocks contributing to these mixtures (mean > 5%)?  
-**Note** the sample sizes for these mixtures are <200 fish, so normally we would not report to this level of detail.
-```{r winter_stock_comp_table_LWintNONISI}
-winter_2018_33RG_estimates.tdy %>% 
+**Note** the sample sizes for NO are larger than SO, hence the smaller standard deviations (and credibility intervals) for NO estiamtes.
+```{r summer_stock_comp_table_SummerRet1NOSO}
+summer_2018_33RG_estimates.tdy %>% 
   mutate(value = value * 100) %>% 
   spread(estimator, value) %>% 
-  filter(mean > 5 & fishery == "LWint" & quadrant != "SO") %>% 
-  mutate(quadrant = factor(x = quadrant, levels = c("NO", "SO", "NI", "SI"))) %>% 
+  filter(mean > 5 & fishery == "SummerRet1" & quadrant %in% c("NO", "SO")) %>% 
   mutate_if(is.numeric, round, 1) %>% 
   arrange(quadrant, fishery, desc(mean)) %>% 
   select(fishery, quadrant, group, mean, sd, `5%`, `95%`)
 ```
 
-```{r winter_troll_figures_LWintNONISI, out.width="100%", out.height="200%"}
-winter_2018_33RG_estimates.tdy %>% 
+```{r summer_troll_figures_SummerRet1NOSO, out.width="100%"}
+summer_2018_33RG_estimates.tdy %>% 
   spread(estimator, value) %>% 
-  filter(fishery == "LWint" & quadrant != "SO") %>% 
-  mutate(quadrant = factor(x = quadrant, levels = c("NO", "SO", "NI", "SI"))) %>%   ggplot(aes(x = group, y = mean * 100)) +
+  filter(fishery == "SummerRet1" & quadrant %in% c("NO", "SO")) %>% 
+  ggplot(aes(x = group, y = mean * 100)) +
   geom_col(fill = "lightblue") +
   geom_errorbar(aes(ymin = `5%` * 100, ymax = `95%` * 100)) +
   theme_bw() +
@@ -134,26 +80,85 @@ winter_2018_33RG_estimates.tdy %>%
   ylim(0, 100) +
   ylab("Stock Composition (%)") +
   xlab("Reporting Group") +
-  ggtitle("Late Winter Troll AY 2018: Quadrant") +
+  ggtitle("Summer Retention 1 Troll AY 2018: Quadrant") +
+  facet_grid(quadrant ~ fishery)
+```
+
+### Summer Retention 1 - All Quadrants
+
+What are the major stocks contributing to these mixtures (mean > 5%)?
+```{r summer_stock_comp_table_SummerRet1AllQuad}
+summer_2018_33RG_stratified_estimates.tdy %>% 
+  mutate(value = value * 100) %>% 
+  spread(estimator, value) %>% 
+  # filter(mean > 5 & fishery == "SummerRet1") %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  arrange(quadrant, fishery, desc(mean)) %>% 
+  select(fishery, quadrant, group, mean, sd, `5%`, `95%`)
+```
+
+```{r summer_troll_figures_SummerRet1AllQuad, out.width="100%"}
+summer_2018_33RG_stratified_estimates.tdy %>% 
+  spread(estimator, value) %>% 
+  filter(fishery == "SummerRet1") %>% 
+  ggplot(aes(x = group, y = mean * 100)) +
+  geom_col(fill = "lightblue") +
+  geom_errorbar(aes(ymin = `5%` * 100, ymax = `95%` * 100)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3)) +
+  ylim(0, 100) +
+  ylab("Stock Composition (%)") +
+  xlab("Reporting Group") +
+  ggtitle("Summer Retention 1 Troll AY 2018: All Quad")
+```
+
+### Summer Retention 2 - Northern Outside (171), Southern Outside (172)
+
+What are the major stocks contributing to these mixtures (mean > 5%)?  
+**Note** the sample sizes for NO are larger than SO, hence the smaller standard deviations (and credibility intervals) for NO estiamtes. Also, the sample size for SO is < 200 fish, so normally we would not report to this level of detail.
+```{r summer_stock_comp_table_SummerRet2NOSO}
+summer_2018_33RG_estimates.tdy %>% 
+  mutate(value = value * 100) %>% 
+  spread(estimator, value) %>% 
+  filter(mean > 5 & fishery == "SummerRet2" & quadrant %in% c("NO", "SO")) %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  arrange(quadrant, fishery, desc(mean)) %>% 
+  select(fishery, quadrant, group, mean, sd, `5%`, `95%`)
+```
+
+```{r summer_troll_figures_SummerRet2NOSO, out.width="100%"}
+summer_2018_33RG_estimates.tdy %>% 
+  spread(estimator, value) %>% 
+  filter(fishery == "SummerRet2" & quadrant %in% c("NO", "SO")) %>% 
+  ggplot(aes(x = group, y = mean * 100)) +
+  geom_col(fill = "lightblue") +
+  geom_errorbar(aes(ymin = `5%` * 100, ymax = `95%` * 100)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3)) +
+  ylim(0, 100) +
+  ylab("Stock Composition (%)") +
+  xlab("Reporting Group") +
+  ggtitle("Summer Retention 2 Troll AY 2018: Quadrant") +
   facet_grid(quadrant ~ .)
 ```
 
-### Late Winter - All Quadrants
+### Summer Retention 2 - All Quadrants
+
 What are the major stocks contributing to these mixtures (mean > 5%)?
-```{r winter_stock_comp_table_LWintAllQuad}
-winter_2018_33RG_stratified_estimates.tdy %>% 
+```{r summer_stock_comp_table_SummerRet2AllQuad}
+summer_2018_33RG_stratified_estimates.tdy %>% 
   mutate(value = value * 100) %>% 
   spread(estimator, value) %>% 
-  filter(mean > 5 & fishery == "LWint") %>% 
+  filter(mean > 5 & fishery == "SummerRet2") %>% 
   mutate_if(is.numeric, round, 1) %>% 
   arrange(quadrant, fishery, desc(mean)) %>% 
   select(fishery, quadrant, group, mean, sd, `5%`, `95%`)
 ```
 
-```{r winter_troll_figures_LWintAllQuad, out.width="100%"}
-winter_2018_33RG_stratified_estimates.tdy %>% 
+```{r summer_troll_figures_SummerRet2AllQuad, out.width="100%"}
+summer_2018_33RG_stratified_estimates.tdy %>% 
   spread(estimator, value) %>% 
-  filter(fishery == "LWint") %>% 
+  filter(fishery == "SummerRet2") %>% 
   ggplot(aes(x = group, y = mean * 100)) +
   geom_col(fill = "lightblue") +
   geom_errorbar(aes(ymin = `5%` * 100, ymax = `95%` * 100)) +
@@ -162,5 +167,332 @@ winter_2018_33RG_stratified_estimates.tdy %>%
   ylim(0, 100) +
   ylab("Stock Composition (%)") +
   xlab("Reporting Group") +
-  ggtitle("Late Winter Troll AY 2018: All Quad")
+  ggtitle("Summer Retention 2 Troll AY 2018: All Quad")
+```
+
+# Troll Summary - AY 2018
+
+This is a heatmap showing the mean stock composition for the 7 "Driver" stocks for each troll period for the Northern Outside Quadrant (NO - 171) and stratified by harvest across all quadrants (All). Overall, the spatio-temporal patterns of stock composition are similar to previous years. Some noteable exceptions are:  
+
+  1) Much higher stock composition of SEAK/TBR during spring troll (not surprising given reductions in time and area to focus on SEAK hatchery fish).  
+  2) Lower contributions of Interior Columbia Summer/Fall to the troll fishery in general after the highs of 2014-2016.  
+  3) Higher contribution of Washington Coast during Summer retention periods.
+```{r troll_2018_heatmap, out.width="100%", out.height="100%", warning=FALSE, message=FALSE}
+troll_2018_8RG_estimates.tdy %>% 
+  mutate(quad = case_when(grepl(pattern = "NO", x = mix) ~ "NO",
+                          TRUE ~ "All")) %>% 
+  mutate(fishery = toupper(substr(x = mixname, start = 1, stop = 2))) %>% 
+  mutate(fishery = case_when(grepl(pattern = "SumRet1", x = mix) ~ "SU1",
+                             grepl(pattern = "SumRet2", x = mix) ~ "SU2",
+                             TRUE ~ fishery)) %>% 
+  mutate(fishery = factor(x = fishery, levels = c("EW", "LW", "SP", "SU1", "SU2"))) %>% 
+  filter(quad %in% c("NO", "All")) %>% 
+  mutate(quad = factor(x = quad, levels = c("All", "NO"))) %>% 
+  spread(estimator, value) %>% 
+  left_join(tibble(group = GroupNames8, group_pub = GroupNames8Pub)) %>% 
+  mutate(group_pub = factor(x = group_pub, levels = GroupNames8Pub)) %>% 
+  ggplot(aes(x = fishery, y = quad, fill = mean)) +
+  geom_tile(colour = "grey") +
+  scale_fill_gradient(low = "white", high = "red", name = "Stock\nComposition") +
+  facet_wrap(~group_pub, nrow = 4, ncol = 2) +
+  theme_bw() +
+  xlab("Fishery") +
+  ylab("Quadrant") +
+  ggtitle("Troll AY 2018")
+```
+
+# Troll Annual Summary - AY 2009-2018
+
+Below is a stratified annual summary of the total AY troll harvest for the past treaty period (AY 2009-2018). The first plot shows stock composition (% of harvest in a given year), the second shows stock-specific harvest (i.e. stock composition * annual harvest). The plot of stock-specific harvest really drives home how much those three years of high Interior Columbia Su/F abundance contributed to the troll fishery.
+```{r troll_stockcomp_2009-2018}
+troll_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  ggplot(aes(x = year, y = mean * 100, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock Composition (%)") +
+  xlab("Year") +
+  ggtitle("SEAK Troll Stock Composition by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
+```
+
+```{r troll_stockharvest_2009, message=FALSE, warning=FALSE}
+troll_harvest_AY_2009_2018 <- read_csv("../Harvest Data/CE008113.csv", skip = 22) %>% 
+  mutate(Quadrant = case_when(`Area Value` == "NE" ~ "NI",
+                              `Area Value` == "NW" ~ "NO",
+                              `Area Value` == "SE" ~ "SI",
+                              `Area Value` == "SW" ~ "SO")) %>% 
+  mutate(District = case_when(Quadrant == "NO" ~ 171,
+                              Quadrant == "SO" ~ 172,
+                              Quadrant == "NI" ~ 173,
+                              Quadrant == "SI" ~ 174)) %>% 
+  mutate(Fishery = case_when(`Time Value` == 6 ~ "Early Winter",
+                             `Time Value` == 1 ~ "Late Winter",
+                             `Time Value` == 2 ~ "Spring Ret 1",
+                             `Time Value` == 3 ~ "Spring Ret 2",
+                             `Time Value` == 4 ~ "Summer Ret 1",
+                             `Time Value` == 5 ~ "Summer Ret 2")) %>% 
+  mutate(Fishery = factor(Fishery, c("Early Winter", "Late Winter", "Spring Ret 1", "Spring Ret 2", "Summer Ret 1", "Summer Ret 2"))) %>% 
+  mutate(AY = case_when(Fishery == "Early Winter" ~ Year + 1,
+                        TRUE ~ Year)) %>% 
+  filter(AY >= 2009 & AY < 2019) %>% 
+  select(AY, Year, Fishery, Quadrant, District, `N Catch`) %>% 
+  rename(Harvest = `N Catch`)
+
+(annual_troll_harvest_AY_2009_2018 <- troll_harvest_AY_2009_2018 %>% 
+    group_by(AY) %>% 
+    summarise(Harvest = sum(Harvest)))
+
+troll_AY_2009_2018_8RG_estimates.tdy %>% 
+  left_join(annual_troll_harvest_AY_2009_2018, by = c("year" = "AY")) %>% 
+  mutate(year = as.character(year)) %>% 
+  ggplot(aes(x = year, y = mean * Harvest / 1000, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  # scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock-Specific Harvest (1,000's)") +
+  xlab("Year") +
+  ggtitle("SEAK Troll Stock-specific Harvest by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
+```
+
+# Sport - AY 2018
+
+## Harvest
+
+**Note** 2018 harvest numbers are *preliminary* from the creel estimates, not the final numbers from the SWHS!
+```{r sport_harvest, message=FALSE}
+harvest_sport <- read_csv(file = "../Harvest Data/preliminary_2018_sport_harvest_chinook.csv")
+
+#~~~~~~~~~~~~~~~~~~
+## Manipulate harvest data
+# Make data tall (tidy), recode sites to ALL CAPS
+level_key <- list("Juneau" = "JUNEAU", 
+                  "Ketchikan" = "KETCHIKAN", 
+                  "Wrangell" = "WRANGELL", 
+                  "Petersburg" = "PETERSBURG", 
+                  "Sitka" = "SITKA", 
+                  "Craig" = "CRAIG_KLAWOCK", 
+                  "Gustavus" = "GUSTAVUS", 
+                  "Elfin Cove" = "ELFIN_COVE", 
+                  "Yakutat" = "YAKUTAT")
+
+harvest_sport <- harvest_sport %>% 
+  gather(site, harvest, -biweek) %>% 
+  mutate(site = recode_factor(site, !!!level_key, .ordered = TRUE))
+
+# Create a variable for Fishery
+harvest_sport <- harvest_sport %>% 
+  mutate(fishery = case_when(site == "KETCHIKAN" ~ "KTN",
+                             site %in% c("PETERSBURG", "WRANGELL") ~ "PB-WR",
+                             site == "JUNEAU" ~ "Inside",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek <= 13 ~ "Outside_early",
+                             site %in% c("YAKUTAT", "GUSTAVUS", "ELFIN_COVE", "SITKA", "CRAIG_KLAWOCK") & biweek > 13 ~ "Outside_late")) %>% 
+  mutate(Fishery = factor(fishery, levels = c("KTN", "PB-WR", "Inside", "Outside_early", "Outside_late")))
+
+# Table of Harvest by site
+harvest_sport %>% 
+  group_by(Fishery) %>% 
+  summarise(Harvest = sum(harvest))
+```
+
+## Sample sizes
+
+Final samples sizes for all "Fisheries". The original plan from our Northern Fund proposal was to run 2,400 fish total for sport, however, due to lower harvest we ended up running ~1,850 fish.  
+**Note** Outside period 1 (thru biweek 13) and 2 (after biweek 13) contain fish sampled from Yakutat, Gustavus, Elfin Cove, Sitka, and Craig. Fish were subsampled by port and biweek proportional to harvest to provide a representative sample of the "fishery".
+```{r sport_n}
+sport_2018_sample_sizes %>% 
+  separate(silly, into = c("Fishery", "Year"), sep = "Sport_") %>% 
+  filter(!Fishery %in% c("CRG", "SIT")) %>% 
+  select(Fishery, genotyped, missing, duplicate, final)
+```
+
+## Stock composition
+
+For each Fishery there will be a table showing stock composition results for all major stocks (i.e. those contributing > 5% to harvest).  
+What are the major stocks contributing to these mixtures (mean > 5%)?  
+**Note** the sample size for PBGWRN was only 96 fish (see table above) **and** the mixture did not adequately converge for estimates of SSEAK (note the very wide 90% CI) and PugetSd (mean < 5%, but 90% CI from 0-11%), please take estiamtes from PBGWRN with a grain of salt.
+```{r sport_stock_comp_table}
+sport_2018_33RG_estimates.tdy %>% 
+  separate(mixname, into = c("fishery", "year"), sep = "Sport_") %>% 
+  mutate(value = value * 100) %>% 
+  spread(estimator, value) %>% 
+  filter(mean > 5 & !fishery %in% c("CRG", "SIT")) %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  mutate(fishery = factor(x = fishery, levels = c("KTN", "PBGWRN", "Inside", "OutsidePer1", "OutsidePer2"))) %>% 
+  arrange(fishery, desc(mean)) %>% 
+  select(fishery, group, mean, sd, `5%`, `95%`)
+```
+
+```{r sport_troll_figures, fig.height=6}
+sport_2018_33RG_estimates.tdy %>% 
+  separate(mixname, into = c("fishery", "year"), sep = "Sport_") %>% 
+  filter(!fishery %in% c("CRG", "SIT")) %>% 
+  mutate(fishery = factor(x = fishery, levels = c("KTN", "PBGWRN", "Inside", "OutsidePer1", "OutsidePer2"))) %>% 
+  spread(estimator, value) %>% 
+  ggplot(aes(x = group, y = mean * 100)) +
+  geom_col(fill = "lightblue") +
+  geom_errorbar(aes(ymin = `5%` * 100, ymax = `95%` * 100)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3)) +
+  ylim(0, 100) +
+  ylab("Stock Composition (%)") +
+  xlab("Reporting Group") +
+  ggtitle("Sport AY 2018") +
+  facet_grid(fishery ~ .)
+```
+
+# Sport Summary - AY 2018
+
+This is a heatmap showing the mean stock composition for the 7 "Driver" stocks for each sport "fishery. Overall, the spatio-temporal patterns of stock composition are very similar to previous years. Some minor exceptions are:  
+
+  1) Similar to the summer troll fishery in outside waters, Washington Coast was more prevalent relative to Interior Columbia Su/F than in past years.  
+  2) A higher contribution of SEAK/TBR outside during the early period.  
+```{r sport_2018_heatmap, out.width="100%", out.height="100%", warning=FALSE, message=FALSE}
+tmp <- sport_2018_8RG_estimates.tdy %>% 
+  filter(!mix %in% c("CRG", "SIT")) %>% 
+  mutate(area = case_when(mix %in% c("OutsidePer1", "OutsidePer2") ~ "Outside",
+                             TRUE ~ mix)) %>% 
+  mutate(area = factor(x = area, levels = c("KTN", "PBGWRN", "Inside", "Outside"))) %>% 
+  mutate(period = case_when(mix == "OutsidePer1" ~ "Early",
+                            mix == "OutsidePer2" ~ "Late",
+                            TRUE ~ "Late"))
+
+sport_2018_8RG_estimates.tdy %>% 
+  filter(!mix %in% c("CRG", "SIT")) %>% 
+  mutate(area = case_when(mix %in% c("OutsidePer1", "OutsidePer2") ~ "Outside",
+                             TRUE ~ mix)) %>% 
+  mutate(area = factor(x = area, levels = c("KTN", "PBGWRN", "Inside", "Outside"))) %>% 
+  mutate(period = case_when(mix == "OutsidePer1" ~ "Early",
+                            mix == "OutsidePer2" ~ "Late",
+                            TRUE ~ "Early")) %>% 
+  bind_rows(tmp) %>%
+  distinct() %>% 
+  mutate(period = factor(x = period, levels = c("Late", "Early"))) %>% 
+  spread(estimator, value) %>% 
+  left_join(tibble(group = GroupNames8, group_pub = GroupNames8Pub)) %>% 
+  mutate(group_pub = factor(x = group_pub, levels = GroupNames8Pub)) %>% 
+  ggplot(aes(x = area, y = period, fill = mean)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "red", name = "Stock\nComposition") +
+  facet_wrap(~group_pub, nrow = 4, ncol = 2) +
+  theme_bw() +
+  xlab("Area") +
+  ylab("Period") +
+  ggtitle("Sport AY 2018")
+```
+
+# Sport Annual Summary - AY 2009-2018
+
+Below is a stratified annual summary of the total AY sport harvest for the past treaty period (AY 2009-2018). The first plot shows stock composition (% of harvest in a given year), the second shows stock-specific harvest (i.e. stock composition * annual harvest). The plot of stock-specific harvest really drives home how much those three years of high Interior Columbia Su/F abundance contributed to the sport fishery (although mostly for outside waters).  
+**Note** 2018 harvest numbers are *preliminary* from the creel estimates, not the final numbers from the SWHS!
+```{r sport_stockcomp_2009-2018}
+sport_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  ggplot(aes(x = year, y = mean * 100, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock Composition (%)") +
+  xlab("Year") +
+  ggtitle("SEAK Sport Stock Composition by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
+```
+
+```{r sport_stockharvest_2009, message=FALSE, warning=FALSE}
+sport_harvest_AY_2008_2017 <- read_csv("../Harvest Data/swhs_est_20190508150526.csv", skip = 2) %>% 
+  gather(year, harvest, -SOUTHEAST)
+
+sport_harvest <- read_csv("../Harvest Data/preliminary_2018_sport_harvest_chinook.csv") %>% 
+  gather(port, harvest, -biweek) %>% 
+  mutate(period = case_when(biweek <= 13 ~ "early",
+                            biweek > 13 ~ "late")) %>% 
+  mutate(fishery = case_when(port == "Ketchikan" ~ "Ketchikan",
+                             port %in% c("Petersburg", "Wrangell") ~ "PBG/WRN",
+                             port == "Juneau" ~ "Inside",
+                             TRUE ~ "Outside"))
+
+(annual_sport_harvest_AY_2009_2018 <- sport_harvest_AY_2008_2017 %>% 
+    filter(year >= 2009 & year <= 2017 & SOUTHEAST == "Southeast Total") %>% 
+    select(year, harvest) %>% 
+    bind_rows(tibble(year = "2018", harvest = sum(sport_harvest$harvest))))
+
+sport_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  left_join(annual_sport_harvest_AY_2009_2018, by = "year") %>% 
+  ggplot(aes(x = year, y = mean * harvest / 1000, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  # scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock-Specific Harvest (1,000's)") +
+  xlab("Year") +
+  ggtitle("SEAK Sport Stock-specific Harvest by AY") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
+```
+
+# Troll vs. Sport Annual Summary - AY 2009-2018
+
+Below is a stratified annual summary of the total AY troll and sport harvest for the past treaty period (AY 2009-2018). The first plot shows stock composition (% of harvest in a given year), the second shows stock-specific harvest (i.e. stock composition * annual harvest). These plots illustrate the differences in stocks targeted by each fishery. Whereas a lot of sport harvest comes from targeting SEAK hatchery-origin fish (especially in inside waters), the vast majority of troll harvest comes from non-SEAK stocks (predominantly in outside waters).
+```{r troll_v_sport_stockcomp}
+sport_AY_2009_2018_8RG_estimates <- sport_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  mutate(fishery = "Sport")
+
+troll_AY_2009_2018_8RG_estimates <- troll_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  mutate(fishery = "Troll")
+
+bind_rows(sport_AY_2009_2018_8RG_estimates, troll_AY_2009_2018_8RG_estimates) %>% 
+  ggplot(aes(x = year, y = mean * 100, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  # scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock Composition (%)") +
+  xlab("Year") +
+  ggtitle("SEAK Stock Composition by AY and Fishery") +
+  theme_classic() +
+  theme(text = element_text(size = 14), axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  facet_grid(. ~ fishery)
+```
+
+```{r troll_v_sport_stockharvest}
+sport_AY_2009_2018_8RG_estimates_harvest <- sport_AY_2009_2018_8RG_estimates.tdy %>% 
+  mutate(year = as.character(year)) %>% 
+  left_join(annual_sport_harvest_AY_2009_2018, by = "year") %>% 
+  mutate(fishery = "Sport")
+
+troll_AY_2009_2018_8RG_estimates_harvest <- troll_AY_2009_2018_8RG_estimates.tdy %>% 
+  left_join(annual_troll_harvest_AY_2009_2018, by = c("year" = "AY")) %>% 
+  mutate(year = as.character(year)) %>% 
+  rename(harvest = Harvest) %>% 
+  mutate(fishery = "Troll")
+
+bind_rows(sport_AY_2009_2018_8RG_estimates_harvest, troll_AY_2009_2018_8RG_estimates_harvest) %>% 
+  ggplot(aes(x = year, y = mean * harvest / 1000, fill = group)) +
+  geom_col() +
+  scale_fill_manual(name = "Reporting Group", 
+                    values = c("blue", "red4", "green2", "purple", "cyan2", "orange", "lightblue", "pink2"),
+                    labels = GroupNames8Pub) +
+  # scale_y_continuous(breaks = seq(0, 100, 20)) +
+  ylab("Stock-Specific Harvest (1,000's)") +
+  xlab("Year") +
+  ggtitle("SEAK Harvest by AY and Fishery") +
+  theme_classic() +
+  theme(text = element_text(size = 14), axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  facet_grid(. ~ fishery)
 ```

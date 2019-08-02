@@ -2888,6 +2888,55 @@ save_objects(objects = objects(pattern = "Spring_2018_"), path = "../Estimates o
 
 ## All year, publication tables
 
+```{r}
+names(Troll_2018_Mixtures_8RG_EstimatesStats)
+objects(pattern = "_8RG_Stratified")
+```
+
+```{r}
+Troll2018_8RG_StratifiedEstimatesStats <- list("EWintAllQuad_2018" = EWint_2018_8RG_StratifiedEstimatesStats,
+                                               "LWintAllQuad_2018" = LWint_2018_8RG_StratifiedEstimatesStats,
+                                               "SpringAllQuad_2018" = Spring_2018_8RG_StratifiedEstimatesStats,
+                                               "SumRet1AllQuad_2018" = SummerRet1_2018_8RG_StratifiedEstimatesStats,
+                                               "SumRet2AllQuad_2018" = SummerRet2_2018_8RG_StratifiedEstimatesStats)
+dput(x = Troll2018_8RG_StratifiedEstimatesStats, file = "../Estimates objects/Troll2018_8RG_StratifiedEstimatesStats.txt")
+
+Troll2018_8RG_EstimatesStats <- list(
+  "EWintNO_2018" = Troll_2018_Mixtures_8RG_EstimatesStats[["EWintNO_2018"]],
+  "EWintAllQuad_2018" = EWint_2018_8RG_StratifiedEstimatesStats,
+  "LWintNO_2018" = Troll_2018_Mixtures_8RG_EstimatesStats[["LWintNO_2018"]],
+  "LWintAllQuad_2018" = LWint_2018_8RG_StratifiedEstimatesStats,
+  "SpringNO_2018" = SpringNO_2018_8RG_StratifiedEstimatesStats,
+  "SpringSI_2018" = SpringSI_2018_8RG_StratifiedEstimatesStats,
+  "SpringAllQuad_2018" = Spring_2018_8RG_StratifiedEstimatesStats,
+  "SumRet1NO_2018" = Troll_2018_Mixtures_8RG_EstimatesStats[["SummerRet1NO_2018"]],
+  "SumRet1AllQuad_2018" = SummerRet1_2018_8RG_StratifiedEstimatesStats,
+  "SumRet2NO_2018" = Troll_2018_Mixtures_8RG_EstimatesStats[["SummerRet2NO_2018"]],
+  "SumRet2AllQuad_2018" = SummerRet2_2018_8RG_StratifiedEstimatesStats
+  )
+dput(x = Troll2018_8RG_EstimatesStats, file = "../Estimates objects/Troll2018_8RG_EstimatesStats.txt")
+```
+
+```{r}
+# make in to a tidy tibble (tall)
+troll_2018_8RG_estimates.tdy <- 
+  bind_rows(
+    lapply(names(Troll2018_8RG_EstimatesStats), function(mix) {  # loop over mixture names
+      Troll2018_8RG_EstimatesStats[[mix]] %>%  # for each matrix
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(mixname = mix) %>%  # make column for mixname
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    } )
+  ) %>% 
+  gather(estimator, value, -mixname, -group, - n_group) %>%  # gather all estimators
+  separate(mixname, c("mix", "year"), sep = "_", remove = FALSE) %>%  # extract mixture and year
+  mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames8))  # factor for ordering
+
+save_objects(c("troll_2018_8RG_estimates.tdy"), "../Estimates objects")
+```
+
+
 ## All year, stratified
 
 Full Accounting Year troll harvest. Note that Winter and Summer are by period and quadrant, but Spring is by month and stat area.
@@ -2963,6 +3012,26 @@ Sport_2018_Mixtures_4RG_EstimatesStats <-
 save_objects(objects = "sport_2018_mixnames", path = "../Objects/")
 save_objects(objects = objects(pattern = "Sport_2018_Mixtures"), path = "../Estimates objects/")
 ```
+
+```{r sport_mixtures_8RG_tidy}
+# make in to a tidy tibble (tall)
+sport_2018_8RG_estimates.tdy <- 
+  bind_rows(
+    lapply(sport_2018_mixnames, function(mix) {  # loop over mixture names
+      Sport_2018_Mixtures_8RG_EstimatesStats[[mix]] %>%  # for each matrix
+        as_tibble(rownames = "group") %>%  # make tibble with rownames as group
+        mutate(mixname = mix) %>%  # make column for mixname
+        mutate(n_group = n_distinct(group))  # make column for number of groups
+    } )
+  ) %>% 
+  gather(estimator, value, -mixname, -group, - n_group) %>%  # gather all estimators
+  separate(mixname, c("mix", "year"), sep = "Sport_", remove = FALSE) %>%  # extract mixture and year
+  mutate(estimator = factor(estimator, c("mean", "sd", "5%", "95%", "median", "P=0", "GR"))) %>%  # factor for ordering
+  mutate(group = factor(group, GroupNames8))  # factor for ordering
+
+save_objects(c("sport_2018_8RG_estimates.tdy"), "../Estimates objects")
+```
+
 
 ## All year, stratified
 
@@ -3243,4 +3312,3 @@ write_csv(x = sport_AY_2009_2018_8RG_estimates.tdy, path = "../Tables/sport_AY_2
 write_csv(x = annual_sport_harvest_AY_2009_2018, path = "../Tables/annual_sport_harvest_AY_2009_2018.csv")
 write_csv(x = annual_troll_harvest_AY_2009_2018, path = "../Tables/annual_troll_harvest_AY_2009_2018.csv")
 ```
-

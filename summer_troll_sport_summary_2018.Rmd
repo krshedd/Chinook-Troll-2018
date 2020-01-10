@@ -496,3 +496,35 @@ bind_rows(sport_AY_2009_2018_8RG_estimates_harvest, troll_AY_2009_2018_8RG_estim
   theme(text = element_text(size = 14), axis.text.x = element_text(angle = 90, vjust = 0.5)) +
   facet_grid(. ~ fishery)
 ```
+
+What is the total toll + sport harvest?
+```{r}
+(annual_harvest <- bind_rows(sport_AY_2009_2018_8RG_estimates_harvest, troll_AY_2009_2018_8RG_estimates_harvest) %>% 
+   mutate(stock_harvest = mean * harvest) %>% 
+   group_by(year) %>% 
+   summarise(total_harvest = sum(stock_harvest))
+)
+```
+
+How much of that total troll + sport harvest was SEAK?
+```{r}
+(annual_seak_harvest <- bind_rows(sport_AY_2009_2018_8RG_estimates_harvest, troll_AY_2009_2018_8RG_estimates_harvest) %>% 
+   mutate(stock_harvest = mean * harvest) %>% 
+   filter(group == "SEAK/TBR") %>% 
+   group_by(year) %>% 
+   summarise(seak_harvest = sum(stock_harvest))
+)
+```
+
+Annual stock comp for troll + sport for SEAK
+```{r}
+annual_seak_harvest %>% 
+  left_join(annual_harvest) %>% 
+  mutate(p_seak = seak_harvest / total_harvest * 100)
+```
+
+Weighted average SEAK stock comp for troll + sprot for AY 2009-2018
+```{r}
+sum(annual_seak_harvest$seak_harvest) / sum(annual_harvest$total_harvest) * 100
+```
+

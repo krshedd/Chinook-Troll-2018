@@ -1,0 +1,166 @@
+---
+title: "Estimates Tables for Report"
+output:
+  html_notebook:
+    theme: united
+    toc: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup}
+source("~/../R/Functions.GCL.R")
+library(tidyverse)
+library(lubridate)
+load_objects("../Objects/")
+```
+# Purpose
+The purpose of this short notebook is to generate publication ready tables for the 2018 Troll + Sport Chinook GSI report
+
+# 8RG Summary Tables
+
+## Sample Sizes
+```{r}
+objects(pattern = "sample")
+```
+Get sample sizes
+```{r}
+(
+  sample_sizes_2018 <-
+    dplyr::bind_rows(
+      winter_2018_sample_sizes,
+      spring_2018_sample_sizes,
+      summer_2018_sample_sizes,
+      sport_2018_sample_sizes
+    )
+)
+```
+
+## Estimates objects
+
+Get objects
+```{r}
+(
+  SEAK18estimatesobjects <-
+    list.files(
+      path = "../Estimates objects",
+      recursive = FALSE,
+      pattern = "_8RG"
+    )
+)
+```
+
+```{r}
+invisible(sapply(SEAK18estimatesobjects, function(objct) {
+  assign(
+    x = unlist(strsplit(x = objct, split = ".txt")),
+    value = dget(file = paste(
+      getwd(), "Estimates objects", objct, sep = "/"
+    )),
+    pos = 1
+  )
+}))
+beep(2)
+```
+
+
+
+
+Troll2017_8RG_StratifiedEstimatesStats <- list("EWintAllQuad_2017" = EWint_2017_8RG_StratifiedEstimatesStats,
+                                               "LWintAllQuad_2017" = LWint_2017_8RG_StratifiedEstimatesStats,
+                                               "SpringAllQuad_2017" = Spring_2017_8RG_StratifiedEstimatesStats)
+dput(x = Troll2017_8RG_StratifiedEstimatesStats, file = "Estimates objects/Troll2017_8RG_StratifiedEstimatesStats.txt")
+
+
+
+SEAK17estimatesobjects <- unlist(lapply(SEAK17estimatesobjects, function(objct) {unlist(strsplit(x = objct, split = ".txt"))}))
+
+Troll2017_8RG_EstimatesStats <- list(
+  "EWintNO_2017" = EWint_2017_8RG_EstimatesStats[["EWintNO_2017"]],
+  "EWintAllQuad_2017" = EWint_2017_8RG_StratifiedEstimatesStats,
+  "LWintNO_2017" = LWint_2017_8RG_EstimatesStats[["LWintNO_2017"]],
+  "LWintAllQuad_2017" = LWint_2017_8RG_StratifiedEstimatesStats,
+  "SpringRet1NO_2017" = SpringRet1_2017_8RG_EstimatesStats[["SpringRet1NO_2017"]],
+  "SpringRet1SI_2017" = SpringRet1_2017_8RG_EstimatesStats[["SpringRet1SI_2017"]],
+  "SpringRet1AllQuad_2017" = SpringRet1_2017_8RG_StratifiedEstimatesStats,
+  "SpringRet2AllQuad_2017" = SpringRet2_2017_8RG_StratifiedEstimatesStats,
+  "SpringNO_2017" = SpringNO_2017_8RG_StratifiedEstimatesStats,
+  "SpringSI_2017" = SpringSI_2017_8RG_StratifiedEstimatesStats,
+  "SpringAllQuad_2017" = Spring_2017_8RG_StratifiedEstimatesStats,
+  "MarkSelectSO_2017" = MSF_2016_2017_8RG_EstimatesStats[["MarkSelectSO_2017"]],
+  "MarkSelect_2017" = MSF_2017_8RG_StratifiedEstimatesStats
+  )
+dput(x = Troll2017_8RG_EstimatesStats, file = "Estimates objects/Troll2017_8RG_EstimatesStats.txt")
+
+# Check GR
+any(sapply(Troll2017_8RG_EstimatesStats, function(mix) {any(mix[, "GR"] > 1.2)}))
+
+
+# Reformat estimates stats
+Troll2017_8RG_EstimatesStats_Formatted <- sapply(Troll2017_8RG_EstimatesStats, function(yr) {
+  matrix(data = yr[, 1:5], nrow = 8, ncol = 5, dimnames = list(GroupNames8Pub, c("Mean", "SD", "Median", "5%", "95%")))
+}, simplify = FALSE)
+dput(x = Troll2017_8RG_EstimatesStats_Formatted, file = "Estimates objects/Troll2017_8RG_EstimatesStats_Formatted.txt")
+
+Troll2017_8RG_PubNames <- setNames(object = c("Northern Outside Quadrant",
+                                              "All Quadrants",
+                                              "Northern Outside Quadrant",
+                                              "All Quadrants",
+                                              "Northern Outside Quadrant",
+                                              "Southern Inside Quadrant",
+                                              "All Quadrants",
+                                              "All Quadrants",
+                                              "Northern Outside Quadrant",
+                                              "Southern Inside Quadrant",
+                                              "All Quadrants",
+                                              "Southern Outside Quadrant",
+                                              "All Quadrants"), 
+                                   nm = names(Troll2017_8RG_EstimatesStats_Formatted))
+dput(x = Troll2017_8RG_PubNames, file = "Objects/Troll2017_8RG_PubNames.txt")
+
+SEAK2017Mixtures <- list.files(path = "BAYES/Mixture", pattern = ".mix", full.names = FALSE, recursive = FALSE)
+# SEAK2017Mixtures <- SEAK2017Mixtures[-c(grep(pattern = "Done", x = SEAK2017Mixtures), grep(pattern = "OLD_BAD_LOCUSCONTROL", x = SEAK2017Mixtures))]
+SEAK2017Mixtures_SampSizes <- sapply(SEAK2017Mixtures, function(mix) {dim(read.table(file = paste0("BAYES/Mixture/", mix)))[1]} )
+names(SEAK2017Mixtures_SampSizes) <- sapply(names(SEAK2017Mixtures_SampSizes), function(mix) {unlist(strsplit(x = mix, split = ".mix"))[1]})
+
+Troll2017_8RG_MixNames <- setNames(object = list("EWintNO_2017",
+                                                 EWint_Mixtures,
+                                                 "LWintNO_2017",
+                                                 LWint_Mixtures,
+                                                 SpringRet1_Mixtures[2],
+                                                 SpringRet1_Mixtures[3],
+                                                 SpringRet1_Mixtures,
+                                                 SpringRet2_Mixtures,
+                                                 c(SpringRet1_Mixtures[2], SpringRet2_Mixtures[2]), 
+                                                 c(SpringRet1_Mixtures[3], SpringRet2_Mixtures[3]),
+                                                 c(SpringRet1_Mixtures, SpringRet2_Mixtures),
+                                                 MSF_Mixtures[3],
+                                                 MSF_Mixtures[2:4]),
+                                   nm = names(Troll2017_8RG_EstimatesStats_Formatted))
+dput(x = Troll2017_8RG_MixNames, file = "Objects/Troll2017_8RG_MixNames.txt")
+
+
+Troll2017_8RG_SampleSizes <- sapply(Troll2017_8RG_MixNames, function(mix) {sum(SEAK2017Mixtures_SampSizes[mix])} )
+
+# Create fully formatted spreadsheat
+EstimatesStats <- Troll2017_8RG_EstimatesStats_Formatted
+SampSizes <- Troll2017_8RG_SampleSizes
+PubNames <- Troll2017_8RG_PubNames
+
+# dir.create("Estimates tables")
+
+for(mix in names(EstimatesStats)) {
+  
+  TableX <- matrix(data = "", nrow = 11, ncol = 7)
+  TableX[1, 3] <- paste(PubNames[mix], "(n=", SampSizes[mix], ")")
+  TableX[2, 6] <- "90% CI"
+  TableX[3, 2:7] <- c("Reporting Group", colnames(EstimatesStats[[mix]]))
+  TableX[4:11, 1] <- 1:8
+  TableX[4:11, 2] <- rownames(EstimatesStats[[mix]])
+  TableX[4:11, 3:7] <- formatC(x = EstimatesStats[[mix]], digits = 3, format = "f")
+  
+  write.xlsx(x = TableX, file = "Estimates tables/Troll2017_8RG_StratifiedEstimatesStats_FormattedPretty.xlsx",
+             col.names = FALSE, row.names = FALSE, sheetName = paste(mix, " Troll 8 Driver"), append = TRUE)
+  
+}
+

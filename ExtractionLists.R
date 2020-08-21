@@ -2202,7 +2202,7 @@ harvest_spring <- read_csv("../Harvest Data/ft - Detailed Fish Tickets_spring.cs
 str(harvest_spring, give.attr = FALSE)
 
 #~~~~~~~~~~~~~~~~~~
-## Manipulate ASL data
+## Manipulate harvest data
 # Year as factor and create a variable for Fishery
 harvest_spring <- harvest_spring %>% 
   mutate(Quadrant = case_when(District %in% c(113, 114, 116, 154, 156, 157) | District >= 181 ~ 171,

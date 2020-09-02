@@ -19,9 +19,11 @@ load_objects("../Objects/")
 # Purpose
 The purpose of this short notebook is to generate publication ready tables for the 2018 Troll + Sport Chinook GSI report
 
-# 8RG Summary Tables
+# Troll
 
-## Estimates objects
+## 8RG Summary Tables
+
+### Estimates objects
 
 Get objects
 ```{r}
@@ -50,13 +52,13 @@ Add in the annual stratified estimates
 Troll2018_8RG_EstimatesStats <- c(Troll2018_8RG_EstimatesStats, list("Annual_2018" = AllYearTroll2018_8RG_StratifiedEstimatesStats))
 ```
 
-## Check GR
+### Check GR
 
 ```{r}
 any(sapply(Troll2018_8RG_EstimatesStats, function(mix) {any(mix[, "GR"] > 1.2)}))
 ```
 
-## Reformat estimates stats
+### Reformat estimates stats
 
 ```{r}
 (
@@ -105,7 +107,7 @@ Rename
 save_objects(objects = "Troll2018_8RG_PubNames", path = "../Objects")
 ```
 
-## Sample Sizes
+### Sample Sizes
 
 ```{r}
 objects(pattern = "sample")
@@ -157,7 +159,7 @@ Get sample sizes
    }))
 ```
 
-## Create fully formatted spreadsheat
+### Create fully formatted spreadsheat
 
 ```{r}
 EstimatesStats <- Troll2018_8RG_EstimatesStats_Formatted
@@ -193,9 +195,9 @@ for(mix in names(EstimatesStats)) {
 }
 ```
 
-# 4RG Summary Tables
+## 4RG Summary Tables
 
-## Estimates objects
+### Estimates objects
 
 Get objects
 ```{r}
@@ -243,13 +245,13 @@ Add in the annual stratified estimates
 Troll2018_4RG_EstimatesStats <- c(Troll2018_4RG_EstimatesStats, list("Annual_2018" = AllYearTroll2018_4RG_StratifiedEstimatesStats))
 ```
 
-## Check GR
+### Check GR
 
 ```{r}
 any(sapply(Troll2018_4RG_EstimatesStats, function(mix) {any(mix[, "GR"] > 1.2)}))
 ```
 
-## Reformat estimates stats
+### Reformat estimates stats
 
 ```{r}
 (
@@ -298,7 +300,7 @@ Rename
 save_objects(objects = "Troll2018_4RG_PubNames", path = "../Objects")
 ```
 
-## Sample Sizes
+### Sample Sizes
 
 ```{r}
 objects(pattern = "sample")
@@ -352,7 +354,7 @@ Get sample sizes
 save_objects(objects = "Troll2018_4RG_SampleSizes", "../Objects/")
 ```
 
-## Create fully formatted spreadsheat
+### Create fully formatted spreadsheat
 
 ```{r}
 EstimatesStats <- Troll2018_4RG_EstimatesStats_Formatted
@@ -391,9 +393,9 @@ for(mix in names(EstimatesStats)) {
 }
 ```
 
-# 18RG Summary Tables
+## 18RG Summary Tables
 
-## Estimates objects
+### Estimates objects
 
 Get objects
 ```{r}
@@ -442,13 +444,13 @@ Add in the annual stratified estimates
 Troll2018_18RG_EstimatesStats <- c(Troll2018_18RG_EstimatesStats, list("Annual_2018" = AllYearTroll2018_18RG_StratifiedEstimatesStats))
 ```
 
-## Check GR
+### Check GR
 
 ```{r}
 any(sapply(Troll2018_18RG_EstimatesStats, function(mix) {any(mix[, "GR"] > 1.2)}))
 ```
 
-## Reformat estimates stats
+### Reformat estimates stats
 
 ```{r}
 (
@@ -473,7 +475,7 @@ save_objects(objects = "Troll2018_18RG_EstimatesStats_Formatted", path = "../Est
 names(Troll2018_18RG_EstimatesStats_Formatted)
 ```
 
-## Create fully formatted spreadsheat
+### Create fully formatted spreadsheat
 
 ```{r}
 EstimatesStats <- Troll2018_18RG_EstimatesStats_Formatted
@@ -512,9 +514,9 @@ for(mix in names(EstimatesStats)) {
 }
 ```
 
-# 33RG Summary Tables
+## 33RG Summary Tables
 
-## Estimates objects
+### Estimates objects
 
 Get objects
 ```{r}
@@ -564,7 +566,7 @@ Add in the annual stratified estimates
 Troll2018_33RG_EstimatesStats <- c(Troll2018_33RG_EstimatesStats, list("Annual_2018" = AllYearTroll2018_33RG_StratifiedEstimatesStats))
 ```
 
-## Check GR
+### Check GR
 
 ```{r}
 any(sapply(Troll2018_33RG_EstimatesStats, function(mix) {any(mix[, "GR"] > 1.2)}))
@@ -585,7 +587,7 @@ sapply(Troll2018_33RG_EstimatesStats[c(8:9, 11:12)], function(x)
 
 Low contributions, NBD.
 
-## Reformat estimates stats
+### Reformat estimates stats
 
 ```{r}
 GroupNames26Pub
@@ -642,7 +644,7 @@ save_objects(objects = "Troll2018_33RG_EstimatesStats_Formatted", path = "../Est
 names(Troll2018_33RG_EstimatesStats_Formatted)
 ```
 
-## Create fully formatted spreadsheat
+### Create fully formatted spreadsheat
 
 ```{r}
 EstimatesStats <- Troll2018_33RG_EstimatesStats_Formatted
@@ -681,19 +683,320 @@ for(mix in names(EstimatesStats)) {
 }
 ```
 
+# Summary Tables Function
 
+## Sport
 
+### Mixtures
+```{r}
+sport_2018_mixnames
+```
+Define mixtures for reporting
+```{r}
+(
+  sport_2018_mixtures <-
+    list(
+      "CRGSport_2018" = sport_2018_mixnames[1],
+      "SITSport_2018" = sport_2018_mixnames[2],
+      "KTNSport_2018" = sport_2018_mixnames[3],
+      "PBGWRNSport_2018" = sport_2018_mixnames[4],
+      "InsideSport_2018" = sport_2018_mixnames[5],
+      "OutsidePer1Sport_2018" = sport_2018_mixnames[6],
+      "OutsidePer2Sport_2018" = sport_2018_mixnames[7],
+      "OutsideSport_2018" = sport_2018_mixnames[6:7],
+      "AllYearSport_2018" = sport_2018_mixnames[3:7]
+    )
+)
+```
 
+```{r}
+(SportMixPub2018 <-  setNames(
+  object = c(
+    "Craig",
+    "Sitka",
+    "Ketchikan",
+    "Petersburg-Wrangell",
+    "Northern Inside",
+    "Outside Biweek 9-13",
+    "Outside Biweek 14-18",
+    "Outside All Year",
+    "AY 2018 Annual"
+  ),
+  nm = names(sport_2018_mixtures)
+))
+```
 
+### Sample sizes
+```{r}
+sport_2018_sample_sizes
+```
 
+```{r}
+(Sport2018_SampleSizes <- sapply(sport_2018_mixtures, function(mix) {
+  sport_2018_sample_sizes %>% filter(silly %in% mix) %>% summarise(final = sum(final)) %>% pull(final)
+}))
+```
 
+### Estimates objects
 
+Get objects
+```{r}
+(
+  SEAK18estimatesobjects <-
+    list.files(
+      path = "../Estimates objects",
+      recursive = FALSE,
+      pattern = "port"
+    )
+)
+```
 
+Load objects
+```{r}
+load_objects(path = "../Estimates objects", pattern = "Sport")
+```
 
+Need to create stratified estimate for all-year outside estimates
+```{r}
+OutsideSport2018_33RG_StratifiedEstimatesStats <-
+  StratifiedEstimator.GCL(
+    groupvec = 1:33,
+    groupnames = GroupNames33,
+    maindir = "../BAYES/Output/",
+    mixvec = sport_2018_mixnames[6:7],
+    catchvec = c(9328, 6475),
+    newname = "OutsideAllQuad",
+    ext = "RGN",
+    nchains = 5,
+    xlxs = FALSE,
+    PosteriorOutput = FALSE
+  )
 
+OutsideSport2018_18RG_StratifiedEstimatesStats <-
+  StratifiedEstimator.GCL(
+    groupvec = GroupVec33RG_to18RG,
+    groupnames = GroupNames18,
+    maindir = "../BAYES/Output/",
+    mixvec = sport_2018_mixnames[6:7],
+    catchvec = c(9328, 6475),
+    newname = "OutsideAllQuad",
+    ext = "RGN",
+    nchains = 5,
+    xlxs = FALSE,
+    PosteriorOutput = FALSE
+  )
 
+OutsideSport2018_8RG_StratifiedEstimatesStats <-
+  StratifiedEstimator.GCL(
+    groupvec = GroupVec33RG_to8RG,
+    groupnames = GroupNames8,
+    maindir = "../BAYES/Output/",
+    mixvec = sport_2018_mixnames[6:7],
+    catchvec = c(9328, 6475),
+    newname = "OutsideAllQuad",
+    ext = "RGN",
+    nchains = 5,
+    xlxs = FALSE,
+    PosteriorOutput = FALSE
+  )
 
+OutsideSport2018_4RG_StratifiedEstimatesStats <-
+  StratifiedEstimator.GCL(
+    groupvec = GroupVec33RG_to4RG,
+    groupnames = GroupNames4,
+    maindir = "../BAYES/Output/",
+    mixvec = sport_2018_mixnames[6:7],
+    catchvec = c(9328, 6475),
+    newname = "OutsideAllQuad",
+    ext = "RGN",
+    nchains = 5,
+    xlxs = FALSE,
+    PosteriorOutput = FALSE
+  )
 
+save_objects(objects = objects(pattern = "OutsideSport2018_"),
+             path = "../Estimates objects/")
+```
 
+#### 4RG
+Create objects
+```{r}
+Sport2018_4RG_EstimatesStats <-
+  c(
+    Sport_2018_Mixtures_4RG_EstimatesStats[1:7],
+    list(
+      "OutsideSport_2018" = OutsideSport2018_4RG_StratifiedEstimatesStats,
+      "AllYearSport_2018" = AllYearSport2018_4RG_StratifiedEstimatesStats
+    )
+  )
 
+(
+  Sport2018_4RG_EstimatesStats_Formatted <-
+    sapply(Sport2018_4RG_EstimatesStats, function(yr) {
+      matrix(
+        data = yr[, 1:5],
+        nrow = 4,
+        ncol = 5,
+        dimnames = list(GroupNames4Pub, c("Mean", "SD", "Median", "5%", "95%"))
+      )
+    }, simplify = FALSE)
+)
+```
+
+#### 8RG
+
+```{r}
+Sport2018_8RG_EstimatesStats <-
+  c(
+    Sport_2018_Mixtures_8RG_EstimatesStats[1:7],
+    list(
+      "OutsideSport_2018" = OutsideSport2018_8RG_StratifiedEstimatesStats,
+      "AllYearSport_2018" = AllYearSport2018_8RG_StratifiedEstimatesStats
+    )
+  )
+
+(
+  Sport2018_8RG_EstimatesStats_Formatted <-
+    sapply(Sport2018_8RG_EstimatesStats, function(yr) {
+      matrix(
+        data = yr[, 1:5],
+        nrow = 8,
+        ncol = 5,
+        dimnames = list(GroupNames8Pub, c("Mean", "SD", "Median", "5%", "95%"))
+      )
+    }, simplify = FALSE)
+)
+```
+
+#### 18RG
+
+```{r}
+Sport2018_18RG_EstimatesStats <-
+  c(
+    Sport_2018_Mixtures_18RG_EstimatesStats[1:7],
+    list(
+      "OutsideSport_2018" = OutsideSport2018_18RG_StratifiedEstimatesStats,
+      "AllYearSport_2018" = AllYearSport2018_18RG_StratifiedEstimatesStats
+    )
+  )
+
+(
+  Sport2018_18RG_EstimatesStats_Formatted <-
+    sapply(Sport2018_18RG_EstimatesStats, function(yr) {
+      matrix(
+        data = yr[, 1:5],
+        nrow = 18,
+        ncol = 5,
+        dimnames = list(GroupNames18Pub, c("Mean", "SD", "Median", "5%", "95%"))
+      )
+    }, simplify = FALSE)
+)
+```
+
+#### 33RG
+
+```{r}
+Sport2018_33RG_EstimatesStats <-
+  c(
+    Sport_2018_Mixtures_33RG_EstimatesStats[1:7],
+    list(
+      "OutsideSport_2018" = OutsideSport2018_33RG_StratifiedEstimatesStats,
+      "AllYearSport_2018" = AllYearSport2018_33RG_StratifiedEstimatesStats
+    )
+  )
+
+(
+  Sport2018_33RG_EstimatesStats_Formatted <-
+    sapply(Sport2018_33RG_EstimatesStats, function(yr) {
+      matrix(
+        data = yr[, 1:5],
+        nrow = 33,
+        ncol = 5,
+        dimnames = list(GroupNames33Pub, c("Mean", "SD", "Median", "5%", "95%"))
+      )
+    }, simplify = FALSE)
+)
+```
+
+Save
+```{r}
+save_objects(objects = objects(pattern = "Sport2018_"),
+             path = "../Estimates objects/")
+```
+
+### Names
+```{r}
+(SportMixPub2018 <-  setNames(
+  object = c(
+    "Craig",
+    "Sitka",
+    "Ketchikan",
+    "Petersburg-Wrangell",
+    "Northern Inside",
+    "Outside Biweek 9-13",
+    "Outside Biweek 14-18",
+    "Outside All Year",
+    "AY 2018 Annual"
+  ),
+  nm = names(sport_2018_mixtures)
+))
+```
+
+# Create fully formatted spreadsheat
+
+```{r}
+table_format.f <- function(EstimatesStats, SampSizes, PubNames, filename, sheetname) {
+  
+  for(mix in names(EstimatesStats)) {
+    
+    nRG <- nrow(EstimatesStats[[mix]])
+    
+    TableX <- matrix(data = "", nrow = (3 + nRG), ncol = 7)
+    TableX[1, 3] <- paste0(PubNames[mix], " (n=", SampSizes[mix], ")")
+    TableX[2, 6] <- "90% CI"
+    TableX[3, 2:7] <- c("Reporting Group", "Mean", "SD", "Median", "5%", "95%")
+    TableX[4:(nRG + 3), 1] <- seq(nRG)
+    TableX[4:(nRG + 3), 2] <- rownames(EstimatesStats[[mix]])
+    TableX[4:(nRG + 3), 3:7] <- formatC(x = EstimatesStats[[mix]][, c("Mean", "SD", "Median", "5%", "95%")], digits = 3, format = "f")
+    
+    write.xlsx(x = TableX, file = paste0("../Estimates tables/", filename, ".xlsx"),
+               col.names = FALSE, row.names = FALSE, sheetName = paste(mix, sheetname), append = TRUE)
+    
+  }
+}
+```
+
+## Sport
+
+```{r}
+table_format.f(EstimatesStats = Sport2018_4RG_EstimatesStats_Formatted, 
+               SampSizes = Sport2018_SampleSizes, 
+               PubNames = SportMixPub2018, 
+               filename = "Sport2018_4RG_StratifiedEstimatesStats_FormattedPretty", 
+               sheetname = "Sport 4RG")
+```
+
+```{r}
+table_format.f(EstimatesStats = Sport2018_8RG_EstimatesStats_Formatted, 
+               SampSizes = Sport2018_SampleSizes, 
+               PubNames = SportMixPub2018, 
+               filename = "Sport2018_8RG_StratifiedEstimatesStats_FormattedPretty", 
+               sheetname = "Sport 8RG")
+```
+
+```{r}
+table_format.f(EstimatesStats = Sport2018_18RG_EstimatesStats_Formatted, 
+               SampSizes = Sport2018_SampleSizes, 
+               PubNames = SportMixPub2018, 
+               filename = "Sport2018_18RG_StratifiedEstimatesStats_FormattedPretty", 
+               sheetname = "Sport 18RG")
+```
+
+```{r}
+table_format.f(EstimatesStats = Sport2018_33RG_EstimatesStats_Formatted, 
+               SampSizes = Sport2018_SampleSizes, 
+               PubNames = SportMixPub2018, 
+               filename = "Sport2018_33RG_StratifiedEstimatesStats_FormattedPretty", 
+               sheetname = "Sport 33RG")
+```
 
